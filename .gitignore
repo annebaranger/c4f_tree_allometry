@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+01-biomass_inference.Rmd
+A01-datasets_compilation.Rmd
+Data_compilation.Rmd
+_targets/
+data/
