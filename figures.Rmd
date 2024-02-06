@@ -1,0 +1,61 @@
+---
+title: "figures"
+author: "Anne Baranger"
+date: "2024-02-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# model shape
+
+## subdata distribution
+
+```{r}
+tar_load(sub.mod.data)
+tar_load(mod.data)
+ggplot(sub.mod.data,aes(dbh,H))+
+    geom_point(aes(color=system))+
+    labs(color="Systems")+
+    scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                       values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+    labs(x="DBH")
+ggplot(mod.data,aes(dbh,H))+
+    geom_point(aes(color=system))+
+    labs(color="Systems")+
+    scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                       values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+    labs(x="DBH")
+```
+
+## Trajectories and predictions/obs
+```{r}
+tar_load(shape.selection)
+shape.selection$data_shape |> 
+  ggplot()+
+  geom_point(aes(x=dbh,y=H,color=system))+
+  geom_ribbon(aes(x=dbh,ymin=q05,ymax=q95), alpha = .25,fill="darkred")+
+  geom_line(aes(x=dbh,y=pred),col="darkred")+
+  labs(color="Systems")+
+  scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  scale_y_log10()+
+  labs(y="log(H)",
+       x="DBH")+
+  geom_hline(yintercept=30)+
+  ylim(0,35)+
+  facet_wrap(~as.factor(mod))
+
+shape.selection$data_shape |> 
+  ggplot(aes(x=log(H), y=log(pred),color=system)) + 
+  geom_point() + 
+  geom_abline(intercept = 0, slope=1,color="darkred") +
+  labs(x="H observed (log)",
+       y="H predicted (log)")+
+  scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  facet_wrap(~mod)
+```
+

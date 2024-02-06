@@ -3,7 +3,7 @@ library(targets)
 
 # Set target options:
 tar_option_set(
-  packages = c("dplyr","stringr","readxl","sf","terra","BIOMASS"), # packages that your targets need to run
+  packages = c("dplyr","stringr","readxl","sf","terra","BIOMASS","rstan"), # packages that your targets need to run
   format = "rds" # default storage format
   # Set other options as needed.
 )
@@ -12,14 +12,12 @@ tar_option_set(
 options(clustermq.scheduler = "multiprocess")
 
 # tar_make_future() configuration (okay to leave alone):
-# Install packages {{future}}, {{future.callr}}, and {{future.batchtools}} to allow use_targets() to configure tar_make_future() options.
 
-# Run the R scripts in the R/ folder with your custom functions:
 tar_source()
 # source("other_functions.R") # Source other scripts as needed. # nolint
 
-# Replace the target list below with your own:
 list(
+  ## Data formating
   tar_target(
     data_tene,
     tene(dir.data="data/tene")
@@ -63,6 +61,25 @@ list(
             data_tene,
             data_mopri.sangoue,
             output.file="all_plot_corr.csv")
+  ),
+  
+  # Fit models
+  tar_target(
+    mod.data,
+    data.fit(tree,
+             plot,
+             frac=1)
+  ),
+  tar_target(
+    sub.mod.data,
+    data.fit(tree,
+             plot,
+             frac=0.1)
+  ),
+  tar_target(
+    shape.selection,
+    shape.select(folder="mod_shape_select",
+                 sub.mod.data)
   ),
   NULL
 )
