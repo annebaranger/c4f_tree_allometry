@@ -81,5 +81,10 @@ list(
     shape.select(folder="mod_shape_select",
                  sub.mod.data)
   ),
+  tar_target(
+    cofactor.selection,
+    cofactor.select(folder="mod_cof_select",
+                    mod.data)
+  ),
   NULL
 )

@@ -24,6 +24,10 @@
 data.fit<-function(tree,
                    plot,
                    frac=1){
+  if(frac!=1){
+    tree<-tree |> 
+      sample_frac(size=frac)
+  }
   data_tree=tree %>%
     left_join(plot) %>%
     filter(!(H==1&dbh>5)) %>% # filter weird tree
@@ -53,10 +57,6 @@ data.fit<-function(tree,
            bio12=bio12/1000,
            bio17=bio17/100)%>%
     mutate_at(c("database","id_plot","id_tree","system","origin","genus","species"),as.factor)
-  if(frac!=1){
-    data_tree<-data_tree |> 
-      sample_frac(size=frac)
-  }
   return(data_tree)
 }
 
@@ -229,3 +229,143 @@ shape.select <- function(folder="mod_shape_select",
   return(list(data_shape=data_shape,
               mod_shape=mod_shape))
 }
+
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 3 - model covariable selection ####
+#' @author Anne Baranger (INRAE - LESSEM)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#' select relevant cofactor 
+#' @note cofactor effect is set on both alpha and beta
+#' @param tree.merge file where trees were merges
+#' @param plot.merge Idem for plots
+#' @param folder folder path
+
+cofactor.select<-function(mod.data,
+                          folder="mod_cof_select"){
+  if(!dir.exists(folder)){
+    dir.create(path=folder)
+  }
+  
+  mod.bic=data.frame(model=c("nul","sys","sys","ori","ori","systori","systori"),
+                     effect=c("nul",rep(c("a","b"),3)),
+                     npar=NA,
+                     lp=NA)
+  
+  # Nul model
+  data_nul = list(
+    N = dim(mod.data)[1],
+    p =nlevels(mod.data$id_plot),
+    sp=nlevels(mod.data$g_s),
+    plot=mod.data$num_plot,
+    species=mod.data$num_species,
+    H = mod.data$H ,
+    dbh=mod.data$dbh
+  )
+  
+  if(!file.exists(file.path(folder,"cof_nul.rdata"))){
+    HD_cof_nul=stan(file="stan/model_cof_nul.stan", # stan program
+                    data = data_nul,         # dataset
+                    warmup = 1000,          # number of warmup iterations per chain
+                    iter = 2000,
+                    cores = 2)   
+    save(HD_cof_nul,file=file.path(folder,"cof_nul.rdata"))
+  }else{
+    load(file.path(folder,"cof_nul.rdata"))
+  }
+  mod.bic[mod.bic$model=="nul",c("npar","lp")]=
+    c(data_nul$p+data_nul$sp+5,
+      summary(HD_cof_nul)$summary["lp__",1])
+  
+  cofactors=mod.data %>% 
+    select(sys,ori,systori)
+  
+  for (i in 1:dim(cofactors)[2]){
+    print(i)
+    cof=colnames(cofactors)[i]
+    data_cof = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      cof=max(cofactors[,i]),
+      plot=mod.data$num_plot,
+      species=mod.data$num_species,
+      cofactor=pull(cofactors,colnames(cofactors)[i]),
+      H = mod.data$H ,
+      dbh=mod.data$dbh
+    )
+    if(!file.exists(file.path(folder,paste0("cof_a_",cof,".rdata")))){
+      HD_cofa=stan(file="stan/model_cof_a.stan",
+                   data=data_cof,
+                   warmup = 1000,
+                   iter=2000,
+                   core=4)
+      save(HD_cofa,file=file.path(folder,paste0("cof_a_",cof,".rdata")))
+    }else{
+      load(file.path(folder,paste0("cof_a_",cof,".rdata")))
+    }
+    mod.bic[mod.bic$model==cof&mod.bic$effect=="a",c("npar","lp")]=
+      c(data_cof$p+data_cof$sp+data_cof$cof+5,
+        summary(HD_cofa)$summary["lp__",1])
+    
+    if(!file.exists(file.path(folder,paste0("cof_b_",cof,".rdata")))){
+      HD_cofb=stan(file="stan/model_cof_b.stan",
+                   data=data_cof,
+                   warmup = 1000,
+                   iter=2000,
+                   core=4)
+      save(HD_cofb,file=file.path(folder,paste0("cof_b_",cof,".rdata")))
+    }else{
+      load(file.path(folder,paste0("cof_b_",cof,".rdata")))
+    }
+    mod.bic[mod.bic$model==cof&mod.bic$effect=="b",c("npar","lp")]=
+      c(data_cof$p+data_cof$sp+data_cof$cof+5,
+        summary(HD_cofb)$summary["lp__",1])
+
+  }
+  mod.bic<-mod.bic |> 
+    mutate(bic=log(dim(mod.data)[1])*npar-2*lp)
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# data_nul= list(
+#   N = dim(mod.data)[1],
+#   p =nlevels(mod.data$id_plot),
+#   sp=nlevels(mod.data$g_s),
+#   so=nlevels(as.factor(mod.data$systori)),
+#   plot=mod.data$num_plot,
+#   species=mod.data$num_species,
+#   systori=as.numeric(mod.data$systori),
+#   H = mod.data$H,
+#   dbh=mod.data$dbh
+# )
+# 
+# if(!file.exists(file.path(folder,"cov_nul.rdata"))){
+#   HD_cov_nul=stan(file="stan/model_cof_nul.stan", # stan program
+#                   data = data_nul,         # dataset
+#                   warmup = 1000,          # number of warmup iterations per chain
+#                   iter = 2000)   
+#   save(HD_cov_nul,file=file.path(folder,"cov_nul.rdata"))
+# }else{
+#   load(file.path(folder,"cov_nul.rdata"))
+# }
+# 
+
