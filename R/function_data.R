@@ -20,7 +20,97 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #' @param dir.data directory of oibt files
-oibt <- function(dir.data){}
+oibt <- function(dir.data="data/oibt"){
+  OIBTtree<-read.csv2(file.path(dir.data,"Ivoire_tdc_cor.csv"))|> 
+    filter(!is.na(DBH)) |> # erase blank rows
+    ## Rename variables for consistency with other database
+    rename_with(tolower,.cols=c("DBH","Date","Pointeur")) |> 
+    rename(site=Foret,
+           name=NomCom,
+           name_sc=NomSc,
+           n_ech=numEch,
+           visee_b=ViseeB,
+           visee_h=ViseeH,
+           H=Ltot,
+           H_fut=Lfut) |>  #formating names of variables
+    unique() |>  
+    ## Compute new variables database, id_plot, origin and system
+    mutate(database=as.factor("OIBT"),
+           site=tools::toTitleCase(tolower(gsub(pattern=" |-","_",site))),
+           name=tools::toTitleCase(tolower(name)),
+           id_plot=as.factor(paste0("OIBT_",site)), #definition of id_plot
+           origin=as.factor(case_when(type=="Naturelle"~"remnant",
+                                      type=="Plantation"~"planted")), # definition of origin
+           system=as.factor(case_when(type=="Naturelle"~"forest",
+                                      type=="Plantation"~"plantation"))) |> 
+    ## Compute new variable id_tree
+    group_by(id_plot) |> 
+    mutate(id_tree=as.factor(paste0(id_plot,"_",row_number())),
+           density=NA) |> 
+    ungroup() |> 
+    ## Tidy
+    relocate(database,id_plot,id_tree,.before=site)
+  
+  # Transitory dataset  
+  datatree_OIBT=OIBTtree |> 
+    ## Correct species
+    # mutate(name_sc=recode_factor(as.factor(name_sc),
+    #                              `Chlorophora_regia-C_excelsa`="Chlorophora_regia",
+    #                              `Lovoa_trichilio\xefdes`="Lovoa_trichiliodes",
+    #                              `Lovoa_trichilio\x95des`="Lovoa_trichiliodes")) |> 
+    tidyr::separate(name_sc,c("genus","species"),sep="_",remove=TRUE) |> #creating genus and species
+    ## Filter inconsistent data
+    filter(pointeur!="KOUASSI") |>  # weird data for these samples
+    filter(H>0 & H<100)
+  
+  # original dataset
+  OIBTenv<-read.csv2(file.path(dir.data,"env.csv")) |> 
+    ## Rename for consistency
+    rename(long=Long,
+           lat=Lat) |> 
+    ## Compute new variable id_plot database and area
+    mutate(site=tools::toTitleCase(tolower(gsub(pattern=" |-","_",site))),
+           id_plot=as.factor(paste0("OIBT_",site)),
+           database=as.factor("OIBT"),
+           area_plot.ha=as.numeric(NA)) |> 
+    ## get system
+    left_join(OIBTtree |> 
+                select(id_plot,system) |> 
+                distinct(),
+              by=c("id_plot")) |> 
+    ## Tidy
+    relocate(database,id_plot,.before=site) 
+
+  
+  ## coordinates conversion into UTM
+  crs="+proj=longlat +datum=WGS84"#"+proj=utm +zone=30"
+  OIBT_longlat30 <- data.frame(id_plot=OIBTenv$id_plot,long=OIBTenv$long,lat=OIBTenv$lat) |> 
+    filter(long>-6) |>
+    vect(geom = c("long", "lat"), crs = crs) |> 
+    project("+proj=utm +zone=30 ellps=WGS84") |> 
+    as.data.frame(geom="XY") |> 
+    rename_with(.cols=c("x","y"),
+                toupper)
+  OIBT_longlat29 <- data.frame(id_plot=OIBTenv$id_plot,long=OIBTenv$long,lat=OIBTenv$lat) |> 
+    filter(long<(-6)) |>
+    vect(geom = c("long", "lat"), crs = crs) |> 
+    project("+proj=utm +zone=29 ellps=WGS84") |> 
+    as.data.frame(geom="XY") |> 
+    rename_with(.cols=c("x","y"),
+                toupper)
+  
+  ### Gathering the 2 utm zones
+  OIBT_longlat=bind_rows(OIBT_longlat29,OIBT_longlat30)
+  
+  # Transitory
+  dataenv_OIBT=OIBTenv |> 
+    # select(-long,-lat) |> 
+    ##Gathering dataenv with newly calculated coordinates
+    left_join(OIBT_longlat,by=c("id_plot")) 
+  
+  return(list(tree=datatree_OIBT,
+              plot=dataenv_OIBT))
+}
                        
                        
 
@@ -99,7 +189,7 @@ tene <- function(dir.data="data/tene"){
     select(-dbh.y) |> 
     rename(dbh=dbh.x)
   
-  #plot n
+  # plot n
   plotn_tene<-TeneTotal |> 
     select(plot,n_tree10) |> 
     unique() |> 
@@ -627,7 +717,7 @@ esanial<-function(dir.data="data/esanial"){
   Elsa_longlat29<-data.frame(id_plot=ElsaEnv$id_plot,long=ElsaEnv$long,lat=ElsaEnv$lat) |> 
     filter(long<(-6)) |> 
     vect(geom = c("long", "lat"), crs = crs) |> 
-    project("+proj=utm +zone=30 ellps=WGS84") |> 
+    project("+proj=utm +zone=29 ellps=WGS84") |> 
     as.data.frame(geom="XY") |> 
     rename_with(.cols=c("x","y"),
                 toupper)
@@ -714,8 +804,31 @@ esanial<-function(dir.data="data/esanial"){
 
 
 
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 7 - Elsa Sanial data ####
+#' @author Anne Baranger (INRAE - LESSEM)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#' @param dir.data directory of ESanial files
+akouassi<-function(dir.data="data/akouassi"){
+  load(file.path(dir.data,"tree_hd.Rdata"))
+  tree_hd |> 
+    rename(H=htot,
+           n_ech=stemID,
+           site=clus) |>
+    mutate(id_plot=paste0("ak_",site,"_",type),
+           id_tree=paste0("ak_",n_ech),
+           database="AimeK",
+           system="agroforestry",
+           origin=case_when(origin=="spontaneous"~"recruited",
+                            TRUE~origin))
+  
+  
+}
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### Section 7 - Merge data ####
+#### Section 8 - Merge data ####
 #' @author Anne Baranger (INRAE - LESSEM)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -725,22 +838,24 @@ esanial<-function(dir.data="data/esanial"){
 #' @param dataset datasets to merge
 #' @param output.file output to be saved
 
-get.tree <- function(bhkamani,
-                     nguessan,
-                     esanial,
-                     lataha,
-                     tene,
-                     mopri.sangoue,
+get.tree <- function(data_bhkamani,
+                     data_nguessan,
+                     data_esanial,
+                     data_lataha,
+                     data_tene,
+                     data_mopri.sangoue,
+                     data_oibt,
                      output.file){
   #DATATREE
-  data_tree<-bind_rows(bhkamani$tree,
-                       nguessan$tree,
-                       esanial$tree) |> #datatree_OIBT,
+  data_tree<-bind_rows(data_bhkamani$tree,
+                       data_nguessan$tree,
+                       data_esanial$tree,
+                       data_oibt$tree) |> #datatree_OIBT,
     mutate(plot=as.character(plot),
            subplot=as.character(subplot)) |> 
-    bind_rows(lataha$tree,
-              tene$tree,
-              mopri.sangoue$tree) |> 
+    bind_rows(data_lataha$tree,
+              data_tene$tree,
+              data_mopri.sangoue$tree) |> 
     mutate(origin=as.character(origin),
            origin_2=as.factor(if_else(system=="forest",
                                       "forest",
@@ -780,6 +895,7 @@ get.env <- function(data_bhkamani,
                     data_lataha,
                     data_tene,
                     data_mopri.sangoue,
+                    data_oibt,
                     output.file){
   data_env=bind_rows(data_bhkamani$plot,
                      data_nguessan$plot,
@@ -787,7 +903,10 @@ get.env <- function(data_bhkamani,
     mutate(plot=as.factor(plot)#,
            # prec=as.character(prec)
            ) |> 
-    bind_rows(data_esanial$plot,data_lataha$plot,data_mopri.sangoue$plot) |> 
+    bind_rows(data_esanial$plot,
+              data_lataha$plot,
+              data_mopri.sangoue$plot,
+              data_oibt$plot |> select(-prec)) |> 
     select(database,id_plot,X,Y,lat,long,area_plot.ha,system)
   # summary(data_env)
   # str(data_env)

@@ -19,6 +19,10 @@ tar_source()
 list(
   ## Data formating
   tar_target(
+    data_oibt,
+    oibt(dir.data="data/oibt")
+  ),
+  tar_target(
     data_tene,
     tene(dir.data="data/tene")
   ),
@@ -50,6 +54,7 @@ list(
              data_lataha,
              data_tene,
              data_mopri.sangoue,
+             data_oibt,
              output.file="all_tree_corr.csv")
   ),
   tar_target(
@@ -60,6 +65,7 @@ list(
             data_lataha,
             data_tene,
             data_mopri.sangoue,
+            data_oibt,
             output.file="all_plot_corr.csv")
   ),
   
