@@ -47,6 +47,10 @@ list(
     esanial(dir.data="data/esanial/")
   ),
   tar_target(
+    data_akouassi,
+    akouassi(dir.data="data/akouassi/")
+  ),
+  tar_target(
     tree,
     get.tree(data_bhkamani,
              data_nguessan,
@@ -55,6 +59,7 @@ list(
              data_tene,
              data_mopri.sangoue,
              data_oibt,
+             data_akouassi,
              output.file="all_tree_corr.csv")
   ),
   tar_target(
@@ -66,6 +71,7 @@ list(
             data_tene,
             data_mopri.sangoue,
             data_oibt,
+            data_akouassi,
             output.file="all_plot_corr.csv")
   ),
   

@@ -42,11 +42,12 @@ oibt <- function(dir.data="data/oibt"){
            origin=as.factor(case_when(type=="Naturelle"~"remnant",
                                       type=="Plantation"~"planted")), # definition of origin
            system=as.factor(case_when(type=="Naturelle"~"forest",
-                                      type=="Plantation"~"plantation"))) |> 
+                                      type=="Plantation"~"plantation"))
+           ) |> 
     ## Compute new variable id_tree
     group_by(id_plot) |> 
     mutate(id_tree=as.factor(paste0(id_plot,"_",row_number())),
-           density=NA) |> 
+           density=as.numeric(NA)) |> 
     ungroup() |> 
     ## Tidy
     relocate(database,id_plot,id_tree,.before=site)
@@ -59,6 +60,8 @@ oibt <- function(dir.data="data/oibt"){
     #                              `Lovoa_trichilio\xefdes`="Lovoa_trichiliodes",
     #                              `Lovoa_trichilio\x95des`="Lovoa_trichiliodes")) |> 
     tidyr::separate(name_sc,c("genus","species"),sep="_",remove=TRUE) |> #creating genus and species
+    mutate(across(where(is.character),as.factor),
+           across(c("visee_b","visee_h"),as.character)) |> 
     ## Filter inconsistent data
     filter(pointeur!="KOUASSI") |>  # weird data for these samples
     filter(H>0 & H<100)
@@ -106,7 +109,8 @@ oibt <- function(dir.data="data/oibt"){
   dataenv_OIBT=OIBTenv |> 
     # select(-long,-lat) |> 
     ##Gathering dataenv with newly calculated coordinates
-    left_join(OIBT_longlat,by=c("id_plot")) 
+    left_join(OIBT_longlat,by=c("id_plot")) |> 
+    mutate(across(where(is.character),as.factor))
   
   return(list(tree=datatree_OIBT,
               plot=dataenv_OIBT))
@@ -187,7 +191,8 @@ tene <- function(dir.data="data/tene"){
     filter(!is.na(species)) |> 
     filter(abs(dbh.y-dbh.x)<10) |> 
     select(-dbh.y) |> 
-    rename(dbh=dbh.x)
+    rename(dbh=dbh.x) |> 
+    mutate(across(where(is.character),as.factor)) 
   
   # plot n
   plotn_tene<-TeneTotal |> 
@@ -211,7 +216,8 @@ tene <- function(dir.data="data/tene"){
            long=as.numeric(long)) |> 
     ## Tidy
     relocate(database,id_plot,.before=site) |> 
-    left_join(plotn_tene)
+    left_join(plotn_tene) |>
+    mutate(across(where(is.character),as.factor))
   
   return(list(tree=datatree_Tene,
               plot=dataenv_Tene))
@@ -254,7 +260,7 @@ bhkamani<-function(dir.data="data/bhkamani"){
            lat=as.numeric(lat),
            long=as.numeric(long),
            id_plot=as.factor(id_plot)) |> 
-    relocate(database,.before=id_plot)
+    relocate(database,.before=id_plot) 
   
   # Clean env
   # rm(dataenv_badenou,dataenv_foumbou,dataenv_HtSassandra,dataenv_Irobo,dataenv_Niegre,dataenv_AmTene,dataenv_Yaya) 
@@ -326,11 +332,13 @@ bhkamani<-function(dir.data="data/bhkamani"){
     left_join(AmaniDensity,by=c("id_plot")) |> 
     filter(dbh<200) |> 
     filter(H<40) |> 
-    filter(!is.na(species))
+    filter(!is.na(species)) |>
+    mutate(across(where(is.character),as.factor))
   
   # Final env
   dataenv_Amani<-dataenv_Amani |> 
-    left_join(AmaniDensity)
+    left_join(AmaniDensity) |>
+    mutate(across(where(is.character),as.factor))
   
   return(list(tree=datatree_Amani,
               plot=dataenv_Amani))
@@ -386,7 +394,8 @@ nguessan<-function(dir.data="data/nguessan"){
   ### Gathering dataenv with newly calculated coordinates
   dataenv_Anny=AnnyEnv |> 
     select(-X,-Y) |> 
-    left_join(Anny_UTM,by=c("id_plot")) 
+    left_join(Anny_UTM,by=c("id_plot")) |> 
+    mutate(across(where(is.character),as.factor))
   
   # original dataset
   Annytree=read.csv2(file.path(dir.data,"data_anny_anne.csv")) |> 
@@ -434,7 +443,8 @@ nguessan<-function(dir.data="data/nguessan"){
   # Final tree
   datatree_Anny=Annytree |> 
     left_join(AnnyDensity,by=c("id_plot")) |> 
-    filter(dbh<200)
+    filter(dbh<200)|> 
+    mutate(across(where(is.character),as.factor))
   
   
   # Final env
@@ -510,7 +520,8 @@ lataha<-function(dir.data="data/lataha"){
            long=case_when(is.na(long)~-5.548512,TRUE~long),
            lat=case_when(is.na(lat)~9.565892,TRUE~lat)) |> 
     unique() |> 
-    ungroup()
+    ungroup() |> 
+    mutate(across(where(is.character),as.factor))
   
   # competition
   LatahaDensity <- dataLataha_tot |> 
@@ -545,7 +556,8 @@ lataha<-function(dir.data="data/lataha"){
     select(database,id_tree,id_plot,plot,n_ech,dbh,genus,species,name_sc,alive,growth,H,origin,system,dbh_cat,h_compet,v_compet,ba_tot,n_tree10) |>
     ## Filter useless individuals : dead trees and trees with no height measures
     filter(alive==1) |> 
-    filter(!is.na(H)) 
+    filter(!is.na(H)) |> 
+    mutate(across(where(is.character),as.factor))
   
   return(list(tree=datatree_Lataha,
               plot=dataenv_Lataha))
@@ -663,12 +675,14 @@ mopri.sangoue<-function(dir.data="data/mopri_sangoue"){
     left_join(MopriSangoue_vcompet,by=c("id_plot")) |> 
     filter(is.na(dbh_cat)==FALSE) |> 
     filter(H<60) |> 
-    filter(dbh<200)
+    filter(dbh<200)|> 
+    mutate(across(where(is.character),as.factor))
   
   dataenv_MopriSangoue=dataMopriSangoue_tot |>
     left_join(MopriSangoue_vcompet) |> 
     select(database,id_plot,plot,location,inventory,system,long,lat,X,Y,area_plot.ha,n_tree10) |> 
-    unique()
+    unique()|> 
+    mutate(across(where(is.character),as.factor))
   
   return(list(tree=datatree_MopriSangoue,
               plot=dataenv_MopriSangoue))
@@ -729,7 +743,8 @@ esanial<-function(dir.data="data/esanial"){
   dataenv_Elsa=ElsaEnv |> 
     # select(long,lat) |> 
     ##Gathering dataenv with newly calculated coordinates
-    left_join(Elsa_longlat,by=c("id_plot")) 
+    left_join(Elsa_longlat,by=c("id_plot")) |> 
+    mutate(across(where(is.character),as.factor))
   
   ### Tree data ###
   #################
@@ -792,7 +807,8 @@ esanial<-function(dir.data="data/esanial"){
     left_join(ElsaHcompet,by=c("id_tree")) |> 
     select(database,id_plot,id_tree,n_ech,name,H,strata,circ,age,family,genus,
            species,dbh,dbh_cat,genusCorr,speciesCorr,familyAPG,origin,system,
-           v_compet,h_compet,ba_tot,n_tree10)
+           v_compet,h_compet,ba_tot,n_tree10)|> 
+    mutate(across(where(is.character),as.factor))
   
   
   dataenv_Elsa=dataenv_Elsa |> 
@@ -806,14 +822,14 @@ esanial<-function(dir.data="data/esanial"){
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### Section 7 - Elsa Sanial data ####
+#### Section 7 - Aime Kouassi data ####
 #' @author Anne Baranger (INRAE - LESSEM)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #' @param dir.data directory of ESanial files
 akouassi<-function(dir.data="data/akouassi"){
   load(file.path(dir.data,"tree_hd.Rdata"))
-  tree_hd |> 
+  ak_tree<-tree_hd |> 
     rename(H=htot,
            n_ech=stemID,
            site=clus) |>
@@ -822,9 +838,50 @@ akouassi<-function(dir.data="data/akouassi"){
            database="AimeK",
            system="agroforestry",
            origin=case_when(origin=="spontaneous"~"recruited",
-                            TRUE~origin))
+                            TRUE~origin),
+           dbh_cat=cut(dbh,
+                       breaks=seq(0,200,by=10))) |> 
+    group_by(id_plot,dbh_cat) |> 
+    mutate(h_compet=n()/0.2) |> 
+    ungroup()
+  
+  ak_plot<-read_sf(dsn=dir.data,layer="sampling") |> 
+    st_point_on_surface() |> 
+    vect() |> 
+    as.data.frame(geom="XY") |> 
+    left_join(readRDS(file.path(dir.data,"plotDB.rds"))) |> 
+    mutate(id_plot=paste0("ak_",clus,"_",type)) |> 
+    select(id_plot,area,x,y)
+  
+  density<- ak_tree |> 
+    filter(dbh>10) |> 
+    left_join(ak_plot) |> 
+    group_by(id_plot) |> 
+    mutate(v_compet=n()/area,
+           ba_tot=sum(pi*((dbh/200)^2),na.rm=TRUE)/area,
+           n_tree10=n()) |> 
+    ungroup() |> 
+    select(id_plot,v_compet,ba_tot,n_tree10) |> 
+    unique()
   
   
+  datatree_ak<-ak_tree |> 
+    left_join(density,by="id_plot") |> 
+    select(database,id_plot,id_tree,site,type,n_ech,
+           system,origin,genus,species,
+           dbh,H,
+           dbh_cat,h_compet,v_compet,ba_tot,n_tree10,
+           WDmean
+           ) |> 
+    mutate(across(where(is.character),as.factor))
+  
+  dataplot_ak<-ak_plot |> 
+    left_join(density) |> 
+    mutate(across(where(is.character),as.factor))
+  
+
+  return(list(tree=datatree_ak,
+              plot=dataplot_ak))
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -845,6 +902,7 @@ get.tree <- function(data_bhkamani,
                      data_tene,
                      data_mopri.sangoue,
                      data_oibt,
+                     data_akouassi,
                      output.file){
   #DATATREE
   data_tree<-bind_rows(data_bhkamani$tree,
@@ -855,7 +913,8 @@ get.tree <- function(data_bhkamani,
            subplot=as.character(subplot)) |> 
     bind_rows(data_lataha$tree,
               data_tene$tree,
-              data_mopri.sangoue$tree) |> 
+              data_mopri.sangoue$tree,
+              data_akouassi$tree) |> 
     mutate(origin=as.character(origin),
            origin_2=as.factor(if_else(system=="forest",
                                       "forest",
@@ -896,6 +955,7 @@ get.env <- function(data_bhkamani,
                     data_tene,
                     data_mopri.sangoue,
                     data_oibt,
+                    data_akouassi,
                     output.file){
   data_env=bind_rows(data_bhkamani$plot,
                      data_nguessan$plot,
@@ -906,7 +966,8 @@ get.env <- function(data_bhkamani,
     bind_rows(data_esanial$plot,
               data_lataha$plot,
               data_mopri.sangoue$plot,
-              data_oibt$plot |> select(-prec)) |> 
+              data_oibt$plot |> select(-prec),
+              data_akouassi$plot) |> 
     select(database,id_plot,X,Y,lat,long,area_plot.ha,system)
   # summary(data_env)
   # str(data_env)
