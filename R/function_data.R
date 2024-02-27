@@ -178,7 +178,8 @@ tene <- function(dir.data="data/tene"){
     ungroup() |> 
     # add species
     left_join(TeneTotal |> 
-                select(n_ech,genus,sp,species,dbh,dbh_cat,v_compet,h_compet,ba_tot,Treatment,X,Y),
+                select(n_ech,genus,sp,species,dbh,
+                       dbh_cat,v_compet,h_compet,ba_tot,Treatment,X,Y),
               by=c("n_ech")) |> 
     # Tidy
     relocate(database,id_plot,id_tree,.before=n_ech) |> 
@@ -245,7 +246,8 @@ bhkamani<-function(dir.data="data/bhkamani"){
   dataenv_Yaya=read.csv2(file.path(dir.data,"yaya_data_env.csv"))
   
   ## gather all datasets
-  dataenv_Amani=bind_rows(dataenv_badenou,dataenv_foumbou,dataenv_HtSassandra,dataenv_Irobo,dataenv_Niegre,dataenv_AmTene,dataenv_Yaya) |> 
+  dataenv_Amani=bind_rows(dataenv_badenou,dataenv_foumbou,dataenv_HtSassandra,
+                          dataenv_Irobo,dataenv_Niegre,dataenv_AmTene,dataenv_Yaya) |> 
     ## Rename data for consistency with other database
     rename(lat="Latitude",
            long="Longitude",
@@ -498,7 +500,9 @@ lataha<-function(dir.data="data/lataha"){
   
   # project coordinates
   crs="+proj=utm +zone=30"
-  Lataha_UTM<-data.frame(id_plot=dataLataha_tot$id_plot,X=dataLataha_tot$X,Y=dataLataha_tot$Y) |> 
+  Lataha_UTM<-data.frame(id_plot=dataLataha_tot$id_plot,
+                         X=dataLataha_tot$X,
+                         Y=dataLataha_tot$Y) |> 
     unique() |> 
     na.omit() |> 
     vect(geom = c("X", "Y"), crs = crs) |> 
@@ -511,7 +515,8 @@ lataha<-function(dir.data="data/lataha"){
   dataenv_Lataha=dataLataha_tot |> 
     group_by(id_plot) |> 
     mutate(area_plot.ha=(max(x)*max(y))/10000)|> 
-    select(database,id_plot,plot,X,Y,planting_density,planting_year,area_plot.ha,system)|> 
+    select(database,id_plot,plot,X,Y,
+           planting_density,planting_year,area_plot.ha,system)|> 
     left_join(Lataha_UTM,by="id_plot") |> 
     mutate(plot=as.factor(plot),
            # fill missing coordinates with mean coordinates of plantation
@@ -553,7 +558,8 @@ lataha<-function(dir.data="data/lataha"){
   datatree_Lataha=dataLataha_tot |> 
     left_join(LatahaDensity,by=c("id_plot")) |> 
     left_join(LatahaHcompet,by=c("id_tree")) |> 
-    select(database,id_tree,id_plot,plot,n_ech,dbh,genus,species,name_sc,alive,growth,H,origin,system,dbh_cat,h_compet,v_compet,ba_tot,n_tree10) |>
+    select(database,id_tree,id_plot,plot,n_ech,dbh,genus,species,name_sc,
+           alive,growth,H,origin,system,dbh_cat,h_compet,v_compet,ba_tot,n_tree10) |>
     ## Filter useless individuals : dead trees and trees with no height measures
     filter(alive==1) |> 
     filter(!is.na(H)) |> 
@@ -851,14 +857,17 @@ akouassi<-function(dir.data="data/akouassi"){
     as.data.frame(geom="XY") |> 
     left_join(readRDS(file.path(dir.data,"plotDB.rds"))) |> 
     mutate(id_plot=paste0("ak_",clus,"_",type)) |> 
-    select(id_plot,area,x,y)
+    select(id_plot,area,x,y) |> 
+    rename(lat=y,
+           long=x,
+           area_plot.ha=area)
   
   density<- ak_tree |> 
     filter(dbh>10) |> 
     left_join(ak_plot) |> 
     group_by(id_plot) |> 
-    mutate(v_compet=n()/area,
-           ba_tot=sum(pi*((dbh/200)^2),na.rm=TRUE)/area,
+    mutate(v_compet=n()/area_plot.ha,
+           ba_tot=sum(pi*((dbh/200)^2),na.rm=TRUE)/area_plot.ha,
            n_tree10=n()) |> 
     ungroup() |> 
     select(id_plot,v_compet,ba_tot,n_tree10) |> 
@@ -877,7 +886,9 @@ akouassi<-function(dir.data="data/akouassi"){
   
   dataplot_ak<-ak_plot |> 
     left_join(density) |> 
-    mutate(across(where(is.character),as.factor))
+    mutate(across(where(is.character),as.factor),
+           database="AimeK",
+           system="agroforestry")
   
 
   return(list(tree=datatree_ak,

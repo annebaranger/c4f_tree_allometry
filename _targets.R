@@ -83,20 +83,35 @@ list(
              frac=1)
   ),
   tar_target(
-    sub.mod.data,
+    sub.mod.data.1,
     data.fit(tree,
              plot,
-             frac=0.1)
+             frac=0.1,
+             ba_require=FALSE)
+  ),
+  tar_target(
+    sub.mod.data.3,
+    data.fit(tree,
+             plot,
+             frac=0.3,
+             ba_require=FALSE)
+  ),
+  tar_target(
+    sub.mod.data.3.ba,
+    data.fit(tree,
+             plot,
+             frac=0.3,
+             ba_require=TRUE)
   ),
   tar_target(
     shape.selection,
     shape.select(folder="mod_shape_select",
-                 sub.mod.data)
+                 sub.mod.data.1)
   ),
   tar_target(
     cofactor.selection,
     cofactor.select(folder="mod_cof_select",
-                    mod.data)
+                    sub.mod.data.3)
   ),
   NULL
 )

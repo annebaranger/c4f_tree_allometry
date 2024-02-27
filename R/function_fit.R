@@ -23,7 +23,12 @@
 
 data.fit<-function(tree,
                    plot,
-                   frac=1){
+                   frac=1,
+                   ba_require=TRUE){
+  if(ba_require){
+    tree<-tree |> 
+      filter(!is.na(ba_tot))
+  }
   if(frac!=1){
     tree<-tree |> 
       sample_frac(size=frac)
@@ -75,6 +80,9 @@ shape.select <- function(folder="mod_shape_select",
   if(!dir.exists(folder)){
     dir.create(path=folder)
   }
+  data.mod<-data.mod |> 
+    filter(!is.na(H),!is.na(dbh))
+  
   data_HD = list(
     N = dim(data.mod)[1],
     H = data.mod$H ,
@@ -255,7 +263,8 @@ cofactor.select<-function(mod.data,
                      effect=c("nul",rep(c("a","b"),3)),
                      npar=NA,
                      lp=NA)
-  
+  mod.data<-mod.data |> 
+    filter(!is.na(H),!is.na(dbh),!is.na(sys),!is.na(ori),!is.na(systori))
   # Nul model
   data_nul = list(
     N = dim(mod.data)[1],
@@ -331,6 +340,110 @@ cofactor.select<-function(mod.data,
     mutate(bic=log(dim(mod.data)[1])*npar-2*lp)
 
 }
+
+
+#' select relevant covariables 
+#' @note cofactor effect is set on both alpha and beta
+#' @param sub.mod.data input dataset, without plots for which BA is not available
+#' @param folder folder path
+
+covariable.select<-function(sub.mod.data,
+                            folder="mod_cov_select"){
+  if(!dir.exists(folder)){
+    dir.create(path=folder)
+  }
+  
+  # mod.bic=data.frame(model=c("nul","sys","sys","ori","ori","systori","systori"),
+  #                    effect=c("nul",rep(c("a","b"),3)),
+  #                    npar=NA,
+  #                    lp=NA)
+  mod.data<-sub.mod.data |> 
+    filter(!is.na(H),!is.na(dbh),!is.na(sys),!is.na(ori),!is.na(systori),
+           !is.na(bio01),!is.na(bio05),!is.na(bio12),!is.na(bio17),
+           !is.na(ba_tot),!is.na(n_tree10))
+  
+  # Nul model
+  data_nul = list(
+    N = dim(mod.data)[1],
+    p =nlevels(mod.data$id_plot),
+    sp=nlevels(mod.data$g_s),
+    plot=mod.data$num_plot,
+    species=mod.data$num_species,
+    H = mod.data$H ,
+    dbh=mod.data$dbh
+  )
+  
+  if(!file.exists(file.path(folder,"nul.rdata"))){
+    HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
+                    data = data_nul,         # dataset
+                    warmup = 1000,          # number of warmup iterations per chain
+                    iter = 2000,
+                    cores = 4)   
+    save(HD_nul,file=file.path(folder,"nul.rdata"))
+  }else{
+    load(file.path(folder,"nul.rdata"))
+  }
+
+  cofactors=c("sys","ori","systori")
+  
+  for (cof in cofactors){
+    print(cof)
+    data_cof = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      ncof=max(mod.data[,cof]),
+      plot=mod.data$num_plot,
+      species=mod.data$num_species,
+      cof=pull(mod.data,cof),
+      H = mod.data$H ,
+      dbh=mod.data$dbh
+    )
+    if(!file.exists(file.path(folder,paste0("nul_",cof,".rdata")))){
+      HD_nul_cof=stan(file="stan/model_cov_nul.stan",
+                   data=data_cof,
+                   warmup = 1000,
+                   iter=2000,
+                   core=4)
+      save(HD_nul_cof,file=file.path(folder,paste0("nul_",cof,".rdata")))
+    }else{
+      load(file.path(folder,paste0("nul_",cof,".rdata")))
+    }
+  }
+  
+  
+  covariables=c("ba_tot","n_tree10","bio01","bio05","bio12","bio17")
+  
+  for (cov in covariables){
+    print(cov)
+    data_systori_cov=list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      so=nlevels(as.factor(mod.data$systori)),
+      plot=mod.data$num_plot,
+      species=mod.data$num_species,
+      systori=mod.data$systori,
+      H = mod.data$H,
+      dbh=mod.data$dbh,
+      cov=pull(mod.data,cov)
+    )
+    if(!file.exists(file.path(folder,paste0("so_",cov,".rdata")))){
+      HD_so_cov=stan(file="stan/model_cov_nul.stan",
+                   data=data_systori_cov,
+                   warmup = 1000,
+                   iter=2000,
+                   core=4)
+      save(HD_so_cov,file=file.path(folder,paste0("so_",cov,".rdata")))
+    }else{
+      load(file.path(folder,paste0("so_",cov,".rdata")))
+    }
+  }
+ 
+  
+}
+
+
 
 
 
