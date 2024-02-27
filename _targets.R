@@ -113,5 +113,10 @@ list(
     cofactor.select(folder="mod_cof_select",
                     sub.mod.data.3)
   ),
+  tar_target(
+    covariable.models,
+    covariable.select(sub.mod.data.3.ba,
+                      folder="mod_cov_select")
+  ),
   NULL
 )

@@ -8,7 +8,7 @@ data {
   int <lower=0,upper=so> systori [N];
   vector <lower=0> [N] H;
   vector <lower=0> [N] dbh;
-  vector <lower=0> [N] precmin;
+  vector <lower=0> [N] cov;
 }
 
 
@@ -19,7 +19,7 @@ parameters {
   real <lower=0,upper=100> beta_0;
   vector <lower=0,upper=100> [so] beta;
   real <lower=0> sigma_b;
-  real <lower=-3,upper=3> beta_precmin;
+  real <lower=-3,upper=3> beta_cov;
   // plot random effect
   vector <lower=0> [p] gamma_plot;
   real<lower=0> sigma_plot;
@@ -33,7 +33,7 @@ model {
   real mu [N];
   real beta_i [N];
   for (i in 1:N) {
-    beta_i[i]=beta[systori[i]]*pow(precmin[i],beta_precmin);
+    beta_i[i]=beta[systori[i]]*pow(cov[i],beta_cov);
     mu[i] = gamma_sp[species[i]]*gamma_plot[plot[i]]*(alpha[systori[i]] * dbh[i])/ 
             (beta_i[i]+dbh[i]);
   }
@@ -43,4 +43,14 @@ model {
   gamma_plot ~ lognormal(0, sigma_plot);
   // Likelihood part of Bayesian inference
   H~lognormal(log(mu),sigma);
+}
+
+generated quantities {
+  vector[N] log_lik;
+  for (i in 1:N) {
+    real beta_i = beta[systori[i]] * pow(cov[i], beta_cov);
+    real mu_i = gamma_sp[species[i]] * gamma_plot[plot[i]] * (alpha[systori[i]] * dbh[i]) / 
+                (beta_i + dbh[i]);
+    log_lik[i] = lognormal_lpdf(H[i] | log(mu_i), sigma);
+  }
 }

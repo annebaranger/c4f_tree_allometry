@@ -40,6 +40,8 @@ data.fit<-function(tree,
     filter(dbh<200) %>% 
     filter(is.na(ba_tot)==FALSE) %>%
     filter(is.na(bio01)==FALSE) %>%
+    filter(!is.na(origin)) |> 
+    filter(!is.na(system)) |> 
     mutate(system=ordered(system,levels=c("forest","secondary_forest","plantation","agroforestry")),
            sys=case_when(system=="forest"~1,
                          system=="secondary_forest"~2,
@@ -343,7 +345,7 @@ cofactor.select<-function(mod.data,
 
 
 #' select relevant covariables 
-#' @note cofactor effect is set on both alpha and beta
+#' @note fit models to be compared
 #' @param sub.mod.data input dataset, without plots for which BA is not available
 #' @param folder folder path
 
@@ -360,7 +362,7 @@ covariable.select<-function(sub.mod.data,
   mod.data<-sub.mod.data |> 
     filter(!is.na(H),!is.na(dbh),!is.na(sys),!is.na(ori),!is.na(systori),
            !is.na(bio01),!is.na(bio05),!is.na(bio12),!is.na(bio17),
-           !is.na(ba_tot),!is.na(n_tree10))
+           !is.na(ba_tot),!is.na(v_compet))
   
   # Nul model
   data_nul = list(
@@ -378,11 +380,15 @@ covariable.select<-function(sub.mod.data,
                     data = data_nul,         # dataset
                     warmup = 1000,          # number of warmup iterations per chain
                     iter = 2000,
-                    cores = 4)   
+                    include = FALSE,
+                    pars=c("gamma_plot","gamma_sp"),
+                    core=4)   
     save(HD_nul,file=file.path(folder,"nul.rdata"))
   }else{
     load(file.path(folder,"nul.rdata"))
   }
+  
+  # cofactors test
 
   cofactors=c("sys","ori","systori")
   
@@ -392,10 +398,10 @@ covariable.select<-function(sub.mod.data,
       N = dim(mod.data)[1],
       p =nlevels(mod.data$id_plot),
       sp=nlevels(mod.data$g_s),
-      ncof=max(mod.data[,cof]),
+      ncof=nlevels(as.factor(mod.data[[cof]])),
       plot=mod.data$num_plot,
       species=mod.data$num_species,
-      cof=pull(mod.data,cof),
+      cof=as.numeric(as.factor(mod.data[[cof]])),
       H = mod.data$H ,
       dbh=mod.data$dbh
     )
@@ -404,6 +410,8 @@ covariable.select<-function(sub.mod.data,
                    data=data_cof,
                    warmup = 1000,
                    iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp"),
                    core=4)
       save(HD_nul_cof,file=file.path(folder,paste0("nul_",cof,".rdata")))
     }else{
@@ -411,8 +419,8 @@ covariable.select<-function(sub.mod.data,
     }
   }
   
-  
-  covariables=c("ba_tot","n_tree10","bio01","bio05","bio12","bio17")
+  # covariables tests
+  covariables=c("ba_tot","v_compet","bio01","bio05","bio12","bio17")
   
   for (cov in covariables){
     print(cov)
@@ -429,10 +437,12 @@ covariable.select<-function(sub.mod.data,
       cov=pull(mod.data,cov)
     )
     if(!file.exists(file.path(folder,paste0("so_",cov,".rdata")))){
-      HD_so_cov=stan(file="stan/model_cov_nul.stan",
+      HD_so_cov=stan(file="stan/model_systori_cov.stan",
                    data=data_systori_cov,
                    warmup = 1000,
                    iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp"),
                    core=4)
       save(HD_so_cov,file=file.path(folder,paste0("so_",cov,".rdata")))
     }else{
@@ -440,6 +450,33 @@ covariable.select<-function(sub.mod.data,
     }
   }
  
+  # complete model
+  data_complete = list(
+    N = dim(mod.data)[1],
+    p =nlevels(mod.data$id_plot),
+    sp=nlevels(mod.data$g_s),
+    so=nlevels(as.factor(mod.data$systori)),
+    plot=mod.data$num_plot,
+    species=mod.data$num_species,
+    systori=mod.data$systori,
+    H = mod.data$H,
+    dbh=mod.data$dbh,
+    ba=mod.data$ba_tot,
+    precmin=mod.data$bio17
+  )
+  
+  if(!file.exists(file.path(folder,"complete.rdata"))){
+    HD_complete=stan(file="stan/model_total_ba_prec.stan", # stan program
+                data = data_complete,         # dataset
+                warmup = 1000,          # number of warmup iterations per chain
+                iter = 2000,
+                include = FALSE,
+                pars=c("gamma_plot","gamma_sp"),
+                core=4)   
+    save(HD_nul,file=file.path(folder,"complete.rdata"))
+  }else{
+    load(file.path(folder,"complete.rdata"))
+  }
   
 }
 

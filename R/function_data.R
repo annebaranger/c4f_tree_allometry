@@ -179,7 +179,7 @@ tene <- function(dir.data="data/tene"){
     # add species
     left_join(TeneTotal |> 
                 select(n_ech,genus,sp,species,dbh,
-                       dbh_cat,v_compet,h_compet,ba_tot,Treatment,X,Y),
+                       dbh_cat,v_compet,h_compet,ba_tot,n_tree10,Treatment,X,Y),
               by=c("n_ech")) |> 
     # Tidy
     relocate(database,id_plot,id_tree,.before=n_ech) |> 

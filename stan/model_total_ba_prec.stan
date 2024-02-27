@@ -46,3 +46,13 @@ model {
   // Likelihood part of Bayesian inference
   H~lognormal(log(mu),sigma);
 }
+
+generated quantities {
+  vector[N] log_lik;
+  for (i in 1:N) {
+    real beta_i = beta[systori[i]] * pow(ba[i], beta_ba) * pow(precmin[i], beta_precmin); // Compute beta_i within loop
+    real mu = gamma_sp[species[i]] * gamma_plot[plot[i]] * (alpha[systori[i]] * dbh[i]) / (beta_i + dbh[i]); // Compute mu within loop
+    log_lik[i] = lognormal_lpdf(H[i] | log(mu), sigma); // Use computed mu for log likelihood
+  }
+}
+

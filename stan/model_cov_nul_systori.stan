@@ -37,3 +37,12 @@ model {
   gamma_plot ~ lognormal(0, sigma_plot);
   H~lognormal(log(mu),sigma);
 }
+
+generated quantities {
+  vector[N] log_lik; // Log-likelihood for each observation
+  for (i in 1:N) {
+    real mu_i = gamma_sp[species[i]] * gamma_plot[plot[i]] * (alpha[systori[i]] * dbh[i]) / 
+                (beta[systori[i]] + dbh[i]);
+    log_lik[i] = lognormal_lpdf(H[i] | log(mu_i), sigma);
+  }
+}
