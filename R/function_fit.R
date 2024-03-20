@@ -365,6 +365,7 @@ covariable.select<-function(sub.mod.data,
            !is.na(ba_tot),!is.na(v_compet))
   
   # Nul model
+  print("nul model")
   data_nul = list(
     N = dim(mod.data)[1],
     p =nlevels(mod.data$id_plot),
@@ -375,7 +376,7 @@ covariable.select<-function(sub.mod.data,
     dbh=mod.data$dbh
   )
   
-  if(!file.exists(file.path(folder,"nul.rdata"))){
+  if(!file.exists(file.path(folder,"mod_nul.rdata"))){
     HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
                     data = data_nul,         # dataset
                     warmup = 1000,          # number of warmup iterations per chain
@@ -383,9 +384,10 @@ covariable.select<-function(sub.mod.data,
                     include = FALSE,
                     pars=c("gamma_plot","gamma_sp"),
                     core=4)   
-    save(HD_nul,file=file.path(folder,"nul.rdata"))
+    save(HD_nul,file=file.path(folder,"mod_nul.rdata"))
   }else{
-    load(file.path(folder,"nul.rdata"))
+    print("model fitted")
+    # load(file.path(folder,"mod_nul.rdata"))
   }
   
   # cofactors test
@@ -415,7 +417,8 @@ covariable.select<-function(sub.mod.data,
                    core=4)
       save(HD_nul_cof,file=file.path(folder,paste0("nul_",cof,".rdata")))
     }else{
-      load(file.path(folder,paste0("nul_",cof,".rdata")))
+      print("model fitted")
+      # load(file.path(folder,paste0("nul_",cof,".rdata")))
     }
   }
   
@@ -446,7 +449,8 @@ covariable.select<-function(sub.mod.data,
                    core=4)
       save(HD_so_cov,file=file.path(folder,paste0("so_",cov,".rdata")))
     }else{
-      load(file.path(folder,paste0("so_",cov,".rdata")))
+      print("model fitted")
+      # load(file.path(folder,paste0("so_",cov,".rdata")))
     }
   }
  
@@ -473,49 +477,55 @@ covariable.select<-function(sub.mod.data,
                 include = FALSE,
                 pars=c("gamma_plot","gamma_sp"),
                 core=4)   
-    save(HD_nul,file=file.path(folder,"complete.rdata"))
+    save(HD_complete,file=file.path(folder,"complete.rdata"))
   }else{
-    load(file.path(folder,"complete.rdata"))
+    print("model fitted")
+    # load(file.path(folder,"complete.rdata"))
   }
   
 }
 
 
 
+#' compare models
+#' @note fit models to be compared
+#' @param files.list files of the models to compare
+#' @param list.names names of the model, same order as files
+
+select.mod <- function(files.list,
+                       list.names) {
+  files <- files.list
+  loo.list <- list()
+  
+  for (i in seq_along(files)) {
+    new_name <- paste0("mod.",list.names[i])
+    load.rename(files[i], new_name)
+    loo.list[[new_name]] <- loo(get(new_name))
+    rm(list = new_name, envir = .GlobalEnv)
+  }
+  
+  names(loo.list) <- paste0("loo.",list.names)
+  comp<-loo_compare(loo.list)
+  return(comp)
+}
 
 
+#' Function to load and rename objects
+#' @param dir.object directory of the object to load
+#' @param new_name names for the object
 
-
-
-
-
-
-
-
-
-
-
-
-# data_nul= list(
-#   N = dim(mod.data)[1],
-#   p =nlevels(mod.data$id_plot),
-#   sp=nlevels(mod.data$g_s),
-#   so=nlevels(as.factor(mod.data$systori)),
-#   plot=mod.data$num_plot,
-#   species=mod.data$num_species,
-#   systori=as.numeric(mod.data$systori),
-#   H = mod.data$H,
-#   dbh=mod.data$dbh
-# )
-# 
-# if(!file.exists(file.path(folder,"cov_nul.rdata"))){
-#   HD_cov_nul=stan(file="stan/model_cof_nul.stan", # stan program
-#                   data = data_nul,         # dataset
-#                   warmup = 1000,          # number of warmup iterations per chain
-#                   iter = 2000)   
-#   save(HD_cov_nul,file=file.path(folder,"cov_nul.rdata"))
-# }else{
-#   load(file.path(folder,"cov_nul.rdata"))
-# }
-# 
-
+load.rename<-function(dir.object,new_name){
+  # Load the RData file and capture the name of the loaded object
+  loaded_names <- load(dir.object)
+  
+  # Check if only one object was loaded and rename it
+  if (length(loaded_names) == 1) {
+    original_name <- loaded_names[1]
+    # Assign the object to the new name and remove the original object
+    assign(new_name, get(original_name),envir = parent.env(as.environment(-1)))
+    rm(list = original_name)
+  } else {
+    cat("More than one object found in the RData file. Please specify which object to rename.")
+  }
+  return(invisible(NULL))
+}

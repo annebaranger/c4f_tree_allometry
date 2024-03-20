@@ -3,7 +3,7 @@ library(targets)
 
 # Set target options:
 tar_option_set(
-  packages = c("dplyr","stringr","readxl","sf","terra","BIOMASS","rstan"), # packages that your targets need to run
+  packages = c("dplyr","stringr","readxl","sf","terra","BIOMASS","rstan","loo"), # packages that your targets need to run
   format = "rds" # default storage format
   # Set other options as needed.
 )
@@ -117,6 +117,25 @@ list(
     covariable.models,
     covariable.select(sub.mod.data.3.ba,
                       folder="mod_cov_select")
+  ),
+  tar_target(
+    comp.cofactor,
+    select.mod(files.list=c("mod_cov_select/mod_nul.rdata",
+                            "mod_cov_select/nul_ori.rdata",
+                            "mod_cov_select/nul_sys.rdata",
+                            "mod_cov_select/nul_systori.rdata"),
+               list.names=c("nul","ori","sys","systori"))
+  ),
+  tar_target(
+    comp.covar,
+    select.mod(files.list=c("mod_cov_select/so_bio01.rdata",
+                            "mod_cov_select/so_bio05.rdata",
+                            "mod_cov_select/so_bio12.rdata",
+                            "mod_cov_select/so_bio17.rdata",
+                            "mod_cov_select/so_v_compet.rdata",
+                            "mod_cov_select/so_ba_tot.rdata",
+                            "mod_cov_select/complete.rdata"),
+               list.names=c("mat","mtwm","map","mpdq","vcomp","ba","complete"))
   ),
   NULL
 )
