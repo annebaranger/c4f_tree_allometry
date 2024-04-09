@@ -11,6 +11,20 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+#' Function to get the path of a file, and create directories if they don't exist
+#' @param file.in character: path of the file, filename included (ex: "plot/plot.png")
+#' @author Julien Barrere
+create_dir_if_needed <- function(file.in){
+  
+  path.in <- strsplit(file.in, "/")[[1]]
+  if(length(path.in) > 1){
+    for(i in 1:(length(path.in)-1)){
+      if(i == 1) path.in_i <- path.in[i]
+      else path.in_i <- paste(path.in_i, path.in[i], sep = "/")
+      if(!dir.exists(path.in_i)) dir.create(path.in_i)
+    }
+  }
+}
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -528,4 +542,195 @@ load.rename<-function(dir.object,new_name){
     cat("More than one object found in the RData file. Please specify which object to rename.")
   }
   return(invisible(NULL))
+}
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 4 - model covariable selection ####
+#' @author Anne Baranger (INRAE - LESSEM)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#' select relevant cofactor 
+#' @note cofactor effect is set on both alpha and beta
+#' @param tree.merge file where trees were merges
+#' @param plot.merge Idem for plots
+#' @param folder folder path
+
+make_subdataset<-function(mod.data,
+                          folder="rds/"){
+  create_dir_if_needed(folder)
+  plot.data<-mod.data |> 
+    dplyr::select(database,id_plot,system,lat,long) |> 
+    unique() 
+  km=kmeans(as.matrix(plot.data[c("long","lat")]),centers=7)
+  km.center=as.data.frame(km$centers) |> tibble::rownames_to_column(var="cls") |> 
+    mutate(cluster_near=NA,
+           cls=as.numeric(cls))
+  for (i in 1:dim(km.center)[1]){
+    print(i)
+    if(km.center$lat[i]>quantile(mod.data$lat,probs = 0.99)[[1]]){
+      ind=which.min(st_distance(st_as_sf(km.center[i,],
+                                         coords=c("long","lat")),
+                                st_as_sf(km.center[-i,],
+                                         coords=c("long","lat"))
+      ))
+      km.center$cluster_near[i]=as.numeric(km.center[-i,][ind,"cls"])
+    }
+  }
+  plot.class=cbind(plot.data,
+                   cluster=km$cluster) |> 
+    left_join(km.center[,c("cls","cluster_near")],by=c("cluster"="cls")) |> 
+    mutate(cluster=case_when(!is.na(cluster_near)~cluster_near,
+                             TRUE~cluster),
+           cluster=as.numeric(as.factor(as.character(cluster)))) |> 
+    group_by(cluster) |> 
+    mutate(n_clust=n()) |> 
+    ungroup()
+  unique(plot.class$cluster)
+  list.subdataset <- vector("list", length(unique(plot.class$cluster)))
+  for (i in unique(plot.class$cluster)){
+    print(i)
+    plot.select=plot.class|>
+      filter(cluster==i)|>
+      pull(id_plot)
+    subdata=mod.data|>
+      filter(id_plot%in%plot.select) |> 
+      mutate(g_s=as.factor(as.character(g_s)),
+             id_plot=as.factor(as.character(id_plot)))
+    saveRDS(subdata,
+            file=paste0(folder,"subdataset_",i,".rds"))
+    list.subdataset[[i]]=paste0(folder,"subdataset_",i,".rds")
+  }
+  return(list.subdataset)
+}
+
+
+#' Fit model on a subselection of the dataset
+#' @param data.file subdataset file path
+
+make_model<-function(sim.plan,
+                     id.sim,
+                     list.subdataset,
+                     folder="mod_spatial_cross_valid/"){
+  print(id.sim)
+  file_data=paste0(folder,"subdata_",sim.plan$subdata[id.sim])
+  file_mod=paste0(file_data,"/",sim.plan$model[id.sim],".RData")
+  if(!dir.exists(folder))dir.create(folder)
+  if(!dir.exists(file_data))dir.create(file_data)
+  mod.data=readRDS(list.subdataset[[sim.plan$subdata[id.sim]]])
+  
+  ## model nul
+  if(sim.plan$model[id.sim]=="nul"){
+    data_nul = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      plot=as.numeric(mod.data$id_plot),
+      species=as.numeric(mod.data$g_s),
+      H = mod.data$H ,
+      dbh=mod.data$dbh
+    )
+    HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
+                    data = data_nul,         # dataset
+                    warmup = 1000,          # number of warmup iterations per chain
+                    iter = 2000,
+                    cores = 4)
+    save(HD_nul,file=file_mod)
+  }
+  
+  ## model origin
+  if(sim.plan$model[id.sim]=="origin"){
+    cof="origin"
+    data_origin = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      ncof=nlevels(as.factor(mod.data[[cof]])),
+      plot=as.numeric(mod.data$id_plot),
+      species=as.numeric(mod.data$g_s),
+      cof=as.numeric(as.factor(mod.data[[cof]])),
+      H = mod.data$H ,
+      dbh=mod.data$dbh
+    )
+    HD_origin=stan(file="stan/model_cov_nul.stan",
+                      data=data_origin,
+                      warmup = 1000,
+                      iter=2000,
+                      include = FALSE,
+                      pars=c("gamma_plot","gamma_sp"),
+                      core=4)
+    save(HD_origin,file=file_mod)
+  }
+  ## model system
+  if(sim.plan$model[id.sim]=="system"){
+    cof="system"
+    data_system = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      ncof=nlevels(as.factor(mod.data[[cof]])),
+      plot=as.numeric(mod.data$id_plot),
+      species=as.numeric(mod.data$g_s),
+      cof=as.numeric(as.factor(mod.data[[cof]])),
+      H = mod.data$H ,
+      dbh=mod.data$dbh
+    )
+    HD_system=stan(file="stan/model_cov_nul.stan",
+                   data=data_system,
+                   warmup = 1000,
+                   iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp"),
+                   core=4)
+    save(HD_system,file=file_mod)
+  }
+  ## model system origin
+  if(sim.plan$model[id.sim]=="systori"){
+    cof="systori"
+    data_systori = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      ncof=nlevels(as.factor(mod.data[[cof]])),
+      plot=as.numeric(mod.data$id_plot),
+      species=as.numeric(mod.data$g_s),
+      cof=as.numeric(as.factor(mod.data[[cof]])),
+      H = mod.data$H ,
+      dbh=mod.data$dbh
+    )
+    HD_systori=stan(file="stan/model_cov_nul.stan",
+                   data=data_systori,
+                   warmup = 1000,
+                   iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp"),
+                   core=4)
+    save(HD_systori,file=file_mod)
+  }
+  ## model complete
+  if(sim.plan$model[id.sim]=="complete"){
+    data_complete = list(
+      N = dim(mod.data)[1],
+      p =nlevels(mod.data$id_plot),
+      sp=nlevels(mod.data$g_s),
+      so=nlevels(as.factor(mod.data$systori)),
+      plot=as.numeric(mod.data$id_plot),
+      species=as.numeric(mod.data$g_s),
+      systori=mod.data$systori,
+      H = mod.data$H,
+      dbh=mod.data$dbh,
+      ba=mod.data$ba_tot,
+      precmin=mod.data$bio17
+    )
+    HD_complete=stan(file="stan/model_total_ba_prec.stan", # stan program
+                     data = data_complete,         # dataset
+                     warmup = 1000,          # number of warmup iterations per chain
+                     iter = 2000,
+                     include = FALSE,
+                     pars=c("gamma_plot","gamma_sp"),
+                     core=4)   
+    save(HD_complete,file=file_mod)
+  }
+  return(file_mod)
 }

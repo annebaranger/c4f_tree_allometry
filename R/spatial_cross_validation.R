@@ -71,4 +71,3 @@ cbind(plot.data,
   ggplot(aes(as.factor(cluster),fill=system))+
   geom_bar()
 
-## divide 

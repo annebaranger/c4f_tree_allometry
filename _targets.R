@@ -3,17 +3,19 @@ library(targets)
 
 # Set target options:
 tar_option_set(
-  packages = c("dplyr","stringr","readxl","sf","terra","BIOMASS","rstan","loo"), # packages that your targets need to run
-  format = "rds" # default storage format
-  # Set other options as needed.
+  packages = c("dplyr","tidyr","stringr","readxl","sf","terra","BIOMASS","rstan","loo","future"), # packages that your targets need to run
+  format = "rds", # default storage format
+  memory="transient"
 )
 
 # tar_make_clustermq() configuration (okay to leave alone):
 options(clustermq.scheduler = "multiprocess")
-
+future::plan(future::multisession, workers = 6)
 # tar_make_future() configuration (okay to leave alone):
 
-tar_source()
+# tar_source()
+source("R/function_data.R")
+source("R/function_fit.R")
 # source("other_functions.R") # Source other scripts as needed. # nolint
 
 list(
@@ -136,6 +138,30 @@ list(
                             "mod_cov_select/so_ba_tot.rdata",
                             "mod_cov_select/complete.rdata"),
                list.names=c("mat","mtwm","map","mpdq","vcomp","ba","complete"))
+  ),
+  tar_target(
+    list.subdataset,
+    make_subdataset(mod.data,
+                    folder="rds/")
+  ),
+  tar_target(
+    sim.plan,
+    data.frame(model=c("nul","system","origin","systori","complete")) |> 
+      crossing(subdata=seq_along(list.subdataset))
+  ),
+  tar_target(
+    id.sim,
+    1:dim(sim.plan)[1]
+  ),
+  tar_target(
+    spatial.cross.val,
+    make_model(sim.plan,
+               id.sim,
+               list.subdataset,
+               folder="mod_spatial_cross_valid/"),
+    pattern=map(id.sim),
+    iteration="vector",
+    format="file"
   ),
   NULL
 )
