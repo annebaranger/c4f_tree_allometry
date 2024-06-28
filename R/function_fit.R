@@ -606,30 +606,45 @@ make_subdataset<-function(mod.data,
 }
 
 
+#' Create blocks for spatial cross-validation
+#' @note use blockCV package
+#' @param mod.data
+#' @param folder folder path
+
+make_blockCV<-function(mod.data,
+                       nfold=5){
+  point_data <- sf::st_as_sf(mod.data, coords = c("long", "lat"), crs = 4326)
+  scv <- cv_cluster(x = point_data,
+                    column = "sys", # optional: counting number of train/test records
+                    k = nfold)
+  
+  return(cbind(mod.data,fold=scv$folds_ids))
+}
+
 #' Fit model on a subselection of the dataset
 #' @param data.file subdataset file path
 
 make_model<-function(sim.plan,
                      id.sim,
-                     list.subdataset,
+                     mod.data.block,
                      folder="mod_spatial_cross_valid/"){
   print(id.sim)
-  file_data=paste0(folder,"subdata_",sim.plan$subdata[id.sim])
+  file_data=paste0(folder,"subdata_",sim.plan$fold[id.sim])
   file_mod=paste0(file_data,"/",sim.plan$model[id.sim],".RData")
   if(!dir.exists(folder))dir.create(folder)
   if(!dir.exists(file_data))dir.create(file_data)
-  mod.data=readRDS(list.subdataset[[sim.plan$subdata[id.sim]]])
+  mod.fold=mod.data.block[mod.data.block$fold!=sim.plan$fold[id.sim],]
   
   ## model nul
   if(sim.plan$model[id.sim]=="nul"){
     data_nul = list(
-      N = dim(mod.data)[1],
-      p =nlevels(mod.data$id_plot),
-      sp=nlevels(mod.data$g_s),
-      plot=as.numeric(mod.data$id_plot),
-      species=as.numeric(mod.data$g_s),
-      H = mod.data$H ,
-      dbh=mod.data$dbh
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
     )
     HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
                     data = data_nul,         # dataset
@@ -643,15 +658,15 @@ make_model<-function(sim.plan,
   if(sim.plan$model[id.sim]=="origin"){
     cof="origin"
     data_origin = list(
-      N = dim(mod.data)[1],
-      p =nlevels(mod.data$id_plot),
-      sp=nlevels(mod.data$g_s),
-      ncof=nlevels(as.factor(mod.data[[cof]])),
-      plot=as.numeric(mod.data$id_plot),
-      species=as.numeric(mod.data$g_s),
-      cof=as.numeric(as.factor(mod.data[[cof]])),
-      H = mod.data$H ,
-      dbh=mod.data$dbh
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      ncof=nlevels(as.factor(mod.fold[[cof]])),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      cof=as.numeric(as.factor(mod.fold[[cof]])),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
     )
     HD_origin=stan(file="stan/model_cov_nul.stan",
                       data=data_origin,
@@ -666,15 +681,15 @@ make_model<-function(sim.plan,
   if(sim.plan$model[id.sim]=="system"){
     cof="system"
     data_system = list(
-      N = dim(mod.data)[1],
-      p =nlevels(mod.data$id_plot),
-      sp=nlevels(mod.data$g_s),
-      ncof=nlevels(as.factor(mod.data[[cof]])),
-      plot=as.numeric(mod.data$id_plot),
-      species=as.numeric(mod.data$g_s),
-      cof=as.numeric(as.factor(mod.data[[cof]])),
-      H = mod.data$H ,
-      dbh=mod.data$dbh
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      ncof=nlevels(as.factor(mod.fold[[cof]])),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      cof=as.numeric(as.factor(mod.fold[[cof]])),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
     )
     HD_system=stan(file="stan/model_cov_nul.stan",
                    data=data_system,
@@ -689,15 +704,15 @@ make_model<-function(sim.plan,
   if(sim.plan$model[id.sim]=="systori"){
     cof="systori"
     data_systori = list(
-      N = dim(mod.data)[1],
-      p =nlevels(mod.data$id_plot),
-      sp=nlevels(mod.data$g_s),
-      ncof=nlevels(as.factor(mod.data[[cof]])),
-      plot=as.numeric(mod.data$id_plot),
-      species=as.numeric(mod.data$g_s),
-      cof=as.numeric(as.factor(mod.data[[cof]])),
-      H = mod.data$H ,
-      dbh=mod.data$dbh
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      ncof=nlevels(as.factor(mod.fold[[cof]])),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      cof=as.numeric(as.factor(mod.fold[[cof]])),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
     )
     HD_systori=stan(file="stan/model_cov_nul.stan",
                    data=data_systori,
@@ -711,17 +726,17 @@ make_model<-function(sim.plan,
   ## model complete
   if(sim.plan$model[id.sim]=="complete"){
     data_complete = list(
-      N = dim(mod.data)[1],
-      p =nlevels(mod.data$id_plot),
-      sp=nlevels(mod.data$g_s),
-      so=nlevels(as.factor(mod.data$systori)),
-      plot=as.numeric(mod.data$id_plot),
-      species=as.numeric(mod.data$g_s),
-      systori=as.numeric(as.factor(mod.data[["systori"]])),
-      H = mod.data$H,
-      dbh=mod.data$dbh,
-      ba=mod.data$ba_tot,
-      precmin=mod.data$bio17
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      so=nlevels(as.factor(mod.fold$systori)),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      systori=as.numeric(as.factor(mod.fold[["systori"]])),
+      H = mod.fold$H,
+      dbh=mod.fold$dbh,
+      ba=mod.fold$ba_tot,
+      precmin=mod.fold$bio17
     )
     HD_complete=stan(file="stan/model_total_ba_prec.stan", # stan program
                      data = data_complete,         # dataset

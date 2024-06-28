@@ -3,7 +3,10 @@ library(targets)
 
 # Set target options:
 tar_option_set(
-  packages = c("dplyr","tidyr","stringr","readxl","sf","terra","BIOMASS","rstan","loo","future"), # packages that your targets need to run
+  packages = c("dplyr","tidyr","stringr",#"readxl","BIOMASS",
+               "sf","terra",
+               "rstan","loo","blockCV",
+               "future"), # packages that your targets need to run
   format = "rds", # default storage format
   memory="transient"
 )
@@ -145,9 +148,14 @@ list(
                     folder="rds/")
   ),
   tar_target(
+    mod.data.block,
+    make_blockCV(mod.data,
+                 nfold=5)
+  ),
+  tar_target(
     sim.plan,
     data.frame(model=c("nul","system","origin","systori","complete")) |> 
-      crossing(subdata=seq_along(list.subdataset))
+      crossing(fold=1:5)
   ),
   tar_target(
     id.sim,
@@ -157,7 +165,7 @@ list(
     spatial.cross.val,
     make_model(sim.plan,
                id.sim,
-               list.subdataset,
+               mod.data.block,
                folder="mod_spatial_cross_valid/"),
     pattern=map(id.sim),
     iteration="vector",

@@ -2,6 +2,7 @@
 library(targets)
 library(sf)
 library(dplyr)
+library(ggplot2)
 
 tar_load(mod.data)
 civ=read_sf(dsn="data/civ/",layer="COTE D'IVE") |> 
