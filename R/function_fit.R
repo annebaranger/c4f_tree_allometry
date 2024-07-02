@@ -26,6 +26,35 @@ create_dir_if_needed <- function(file.in){
   }
 }
 
+loadRData <- function(fileName){
+  #loads an RData file, and returns it
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
+model_nul <- function(x,alpha,beta,gamma_sp,gamma_plot) {
+  gamma_sp*gamma_plot*(alpha * x)/ 
+    (beta + x)
+}
+
+model_origin <- function(x,alpha_ori,beta_ori,gamma_sp,gamma_plot){
+  gamma_sp*gamma_plot*(alpha_ori * x)/ 
+    (beta_ori+x)
+}
+
+model_system <- function(x,alpha_sys,beta_sys,gamma_sp,gamma_plot){
+  gamma_sp*gamma_plot*(alpha_sys * x)/ 
+    (beta_sys+x)
+}
+
+model_systori <- function(x,alpha_systori,beta_systori,gamma_sp,gamma_plot){
+  gamma_sp*gamma_plot*(alpha_systori * x)/ 
+    (beta_systori + x)
+}
+
+model_complete <- function(x,ba,precmin,alpha_sys,beta_sys,beta_ba,beta_precmin){
+   alpha_sys * x /
+    (beta_sys*(ba^beta_ba) * (precmin^beta_precmin) + x)}
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 1 - data fit ####
@@ -546,7 +575,7 @@ load.rename<-function(dir.object,new_name){
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### Section 4 - model covariable selection ####
+#### Section 4 - spatial cross validation ####
 #' @author Anne Baranger (INRAE - LESSEM)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -622,7 +651,10 @@ make_blockCV<-function(mod.data,
 }
 
 #' Fit model on a subselection of the dataset
-#' @param data.file subdataset file path
+#' @param sim.plan table with all model to run on which dataset
+#' @param id.sim id of the model x dataset to run
+#' @param mod.data.block data with block from blockCV
+#' @param folder where to save models
 
 make_model<-function(sim.plan,
                      id.sim,
@@ -748,4 +780,150 @@ make_model<-function(sim.plan,
     save(HD_complete,file=file_mod)
   }
   return(file_mod)
+}
+
+#' Fit model on a subselection of the dataset
+#' @param sim.plan table with all model to run on which dataset
+#' @param id.sim id of the model x dataset to run
+#' @param mod.data.block data with block from blockCV
+#' @param folder where to save models
+
+get_prediction<-function(spatial.cross.val,
+                         sim.plan,
+                         id.sim,
+                         mod.data.block){
+  print(id.sim)
+  file_mod=spatial.cross.val[id.sim]
+  mod=sim.plan$model[id.sim]
+  mod.train=mod.data.block[mod.data.block$fold!=sim.plan$fold[id.sim],]
+  mod.test=mod.data.block[mod.data.block$fold==sim.plan$fold[id.sim],]
+  mod_fit=loadRData(file_mod)
+  par_mod<- as.data.frame(mod_fit) |> 
+    dplyr::select(!matches(c("log_lik","lp__"))) 
+  
+  ## model nul
+  if(mod=="nul"){
+    
+    par_mod<- rstan::extract(mod_HD_loglin)
+    loglin<-summary(mod_HD_loglin)[[1]]
+    data.lin<-data.mod |> 
+      rowwise() |> 
+      mutate(pred=median(model(dbh,
+                               par_mod$alpha,
+                               par_mod$beta)),
+             q05=quantile(model(dbh,
+                                par_mod$alpha,
+                                par_mod$beta),
+                          probs = 0.05),
+             q95=quantile(model(dbh,
+                                par_mod$alpha,
+                                par_mod$beta),
+                          probs = 0.95)) |>
+      mutate(mod="loglin") |> 
+      ungroup()
+    data_nul = list(
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
+    )
+    HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
+                data = data_nul,         # dataset
+                warmup = 1000,          # number of warmup iterations per chain
+                iter = 2000,
+                cores = 4)
+    save(HD_nul,file=file_mod)
+  }
+  
+  ## model origin
+  if(sim.plan$model[id.sim]=="origin"){
+    cof="origin"
+    data_origin = list(
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      ncof=nlevels(as.factor(mod.fold[[cof]])),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      cof=as.numeric(as.factor(mod.fold[[cof]])),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
+    )
+    HD_origin=stan(file="stan/model_cov_nul.stan",
+                   data=data_origin,
+                   warmup = 1000,
+                   iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp"),
+                   core=4)
+    save(HD_origin,file=file_mod)
+  }
+  ## model system
+  if(sim.plan$model[id.sim]=="system"){
+    cof="system"
+    data_system = list(
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      ncof=nlevels(as.factor(mod.fold[[cof]])),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      cof=as.numeric(as.factor(mod.fold[[cof]])),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
+    )
+    HD_system=stan(file="stan/model_cov_nul.stan",
+                   data=data_system,
+                   warmup = 1000,
+                   iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp"),
+                   core=4)
+    save(HD_system,file=file_mod)
+  }
+  ## model system origin
+  if(sim.plan$model[id.sim]=="systori"){
+    cof="systori"
+    data_systori = list(
+      N = dim(mod.fold)[1],
+      p =nlevels(mod.fold$id_plot),
+      sp=nlevels(mod.fold$g_s),
+      ncof=nlevels(as.factor(mod.fold[[cof]])),
+      plot=as.numeric(mod.fold$id_plot),
+      species=as.numeric(mod.fold$g_s),
+      cof=as.numeric(as.factor(mod.fold[[cof]])),
+      H = mod.fold$H ,
+      dbh=mod.fold$dbh
+    )
+    HD_systori=stan(file="stan/model_cov_nul.stan",
+                    data=data_systori,
+                    warmup = 1000,
+                    iter=2000,
+                    include = FALSE,
+                    pars=c("gamma_plot","gamma_sp"),
+                    core=4)
+    save(HD_systori,file=file_mod)
+  }
+  ## model complete
+  if(mod=="complete"){
+    n=dim(mod.test)[1]
+    for (i in 1:n){
+      print(i)
+      cof=mod.test$systori[i]
+      dbh=mod.test$dbh[i]
+      ba=mod.test$ba_tot[i]
+      prec=mod.test$bio17[i]
+      H=model_complete(dbh,ba, prec, 
+                       alpha_sys=par_mod[[paste0("alpha[",cof,"]")]],
+                       beta_sys=par_mod[[paste0("beta[",cof,"]")]],
+                       beta_ba=par_mod[["beta_ba"]],
+                       beta_precmin=par_mod[["beta_precmin"]] )
+      mod.train$H_med[i]=median(H)
+      mod.train$H_q05[i]=quantile(H,probs=0.05)
+      mod.train$H_q95[i]=quantile(H,probs=0.95)
+    }
+  }
 }
