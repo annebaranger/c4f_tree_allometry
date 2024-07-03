@@ -805,109 +805,71 @@ get_prediction<-function(spatial.cross.val,
   
   ## model nul
   if(mod=="nul"){
-    
-    par_mod<- rstan::extract(mod_HD_loglin)
-    loglin<-summary(mod_HD_loglin)[[1]]
-    data.lin<-data.mod |> 
-      rowwise() |> 
-      mutate(pred=median(model(dbh,
-                               par_mod$alpha,
-                               par_mod$beta)),
-             q05=quantile(model(dbh,
-                                par_mod$alpha,
-                                par_mod$beta),
-                          probs = 0.05),
-             q95=quantile(model(dbh,
-                                par_mod$alpha,
-                                par_mod$beta),
-                          probs = 0.95)) |>
-      mutate(mod="loglin") |> 
-      ungroup()
-    data_nul = list(
-      N = dim(mod.fold)[1],
-      p =nlevels(mod.fold$id_plot),
-      sp=nlevels(mod.fold$g_s),
-      plot=as.numeric(mod.fold$id_plot),
-      species=as.numeric(mod.fold$g_s),
-      H = mod.fold$H ,
-      dbh=mod.fold$dbh
-    )
-    HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
-                data = data_nul,         # dataset
-                warmup = 1000,          # number of warmup iterations per chain
-                iter = 2000,
-                cores = 4)
-    save(HD_nul,file=file_mod)
+    n=dim(mod.test)[1]
+    for (i in 1:n){
+      print(i)
+      dbh=mod.test$dbh[i]
+      H=model_system(dbh,
+                     alpha=par_mod[["alpha_0"]],
+                     beta=par_mod[["beta_0"]],
+                     1,
+                     1)
+      mod.test$H_med[i]=median(H)
+      mod.test$H_q05[i]=quantile(H,probs=0.05)
+      mod.test$H_q95[i]=quantile(H,probs=0.95)
+    }
   }
   
   ## model origin
   if(sim.plan$model[id.sim]=="origin"){
-    cof="origin"
-    data_origin = list(
-      N = dim(mod.fold)[1],
-      p =nlevels(mod.fold$id_plot),
-      sp=nlevels(mod.fold$g_s),
-      ncof=nlevels(as.factor(mod.fold[[cof]])),
-      plot=as.numeric(mod.fold$id_plot),
-      species=as.numeric(mod.fold$g_s),
-      cof=as.numeric(as.factor(mod.fold[[cof]])),
-      H = mod.fold$H ,
-      dbh=mod.fold$dbh
-    )
-    HD_origin=stan(file="stan/model_cov_nul.stan",
-                   data=data_origin,
-                   warmup = 1000,
-                   iter=2000,
-                   include = FALSE,
-                   pars=c("gamma_plot","gamma_sp"),
-                   core=4)
-    save(HD_origin,file=file_mod)
+    n=dim(mod.test)[1]
+    for (i in 1:n){
+      print(i)
+      cof=mod.test$ori[i]
+      dbh=mod.test$dbh[i]
+      H=model_origin(dbh,
+                     alpha_ori=par_mod[[paste0("alpha[",cof,"]")]],
+                     beta_ori=par_mod[[paste0("beta[",cof,"]")]],
+                     1,
+                     1)
+      mod.test$H_med[i]=median(H)
+      mod.test$H_q05[i]=quantile(H,probs=0.05)
+      mod.test$H_q95[i]=quantile(H,probs=0.95)
+    }
   }
   ## model system
   if(sim.plan$model[id.sim]=="system"){
-    cof="system"
-    data_system = list(
-      N = dim(mod.fold)[1],
-      p =nlevels(mod.fold$id_plot),
-      sp=nlevels(mod.fold$g_s),
-      ncof=nlevels(as.factor(mod.fold[[cof]])),
-      plot=as.numeric(mod.fold$id_plot),
-      species=as.numeric(mod.fold$g_s),
-      cof=as.numeric(as.factor(mod.fold[[cof]])),
-      H = mod.fold$H ,
-      dbh=mod.fold$dbh
-    )
-    HD_system=stan(file="stan/model_cov_nul.stan",
-                   data=data_system,
-                   warmup = 1000,
-                   iter=2000,
-                   include = FALSE,
-                   pars=c("gamma_plot","gamma_sp"),
-                   core=4)
-    save(HD_system,file=file_mod)
+    n=dim(mod.test)[1]
+    for (i in 1:n){
+      print(i)
+      cof=mod.test$sys[i]
+      dbh=mod.test$dbh[i]
+      H=model_system(dbh,
+                     alpha_sys=par_mod[[paste0("alpha[",cof,"]")]],
+                     beta_sys=par_mod[[paste0("beta[",cof,"]")]],
+                     1,
+                     1)
+      mod.test$H_med[i]=median(H)
+      mod.test$H_q05[i]=quantile(H,probs=0.05)
+      mod.test$H_q95[i]=quantile(H,probs=0.95)
+    }
   }
   ## model system origin
   if(sim.plan$model[id.sim]=="systori"){
-    cof="systori"
-    data_systori = list(
-      N = dim(mod.fold)[1],
-      p =nlevels(mod.fold$id_plot),
-      sp=nlevels(mod.fold$g_s),
-      ncof=nlevels(as.factor(mod.fold[[cof]])),
-      plot=as.numeric(mod.fold$id_plot),
-      species=as.numeric(mod.fold$g_s),
-      cof=as.numeric(as.factor(mod.fold[[cof]])),
-      H = mod.fold$H ,
-      dbh=mod.fold$dbh
-    )
-    HD_systori=stan(file="stan/model_cov_nul.stan",
-                    data=data_systori,
-                    warmup = 1000,
-                    iter=2000,
-                    include = FALSE,
-                    pars=c("gamma_plot","gamma_sp"),
-                    core=4)
-    save(HD_systori,file=file_mod)
+    n=dim(mod.test)[1]
+    for (i in 1:n){
+      print(i)
+      cof=mod.test$systori[i]
+      dbh=mod.test$dbh[i]
+      H=model_systori(dbh,
+                     alpha_systori=par_mod[[paste0("alpha[",cof,"]")]],
+                     beta_systori=par_mod[[paste0("beta[",cof,"]")]],
+                     1,
+                     1)
+      mod.test$H_med[i]=median(H)
+      mod.test$H_q05[i]=quantile(H,probs=0.05)
+      mod.test$H_q95[i]=quantile(H,probs=0.95)
+    }
   }
   ## model complete
   if(mod=="complete"){
@@ -923,9 +885,32 @@ get_prediction<-function(spatial.cross.val,
                        beta_sys=par_mod[[paste0("beta[",cof,"]")]],
                        beta_ba=par_mod[["beta_ba"]],
                        beta_precmin=par_mod[["beta_precmin"]] )
-      mod.train$H_med[i]=median(H)
-      mod.train$H_q05[i]=quantile(H,probs=0.05)
-      mod.train$H_q95[i]=quantile(H,probs=0.95)
+      mod.test$H_med[i]=median(H)
+      mod.test$H_q05[i]=quantile(H,probs=0.05)
+      mod.test$H_q95[i]=quantile(H,probs=0.95)
     }
   }
 }
+# 
+# library(ggplot2)
+# mod.test |> 
+#   ggplot(aes(dbh,H_med,color=system))+
+#   geom_point()+
+#   facet_wrap(~origin)
+# mod.test |> 
+#   mutate(delta=(H-H_med)/H) |> 
+#   ggplot(aes(delta,color=system))+
+#   geom_density()
+# dataWD <- getWoodDensity(
+#   genus = mod.test$genusCorr,
+#   species = mod.test$speciesCorr,
+#   stand = mod.test$id_plot)
+# mod.test$AGBobs<- computeAGB(D = mod.test$dbh,
+#                              WD = dataWD$meanWD,
+#                              H = mod.test$H)
+# mod.test$AGBpred<- computeAGB(D = mod.test$dbh,
+#                     WD = dataWD$meanWD,
+#                     H = mod.test$H_med)
+# mod.test |> 
+#   mutate(dAGB=100*(AGBobs-AGBpred)/AGBobs) |> 
+#   ggplot(aes(dAGB,color=system))+geom_density()

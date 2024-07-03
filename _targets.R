@@ -150,12 +150,12 @@ list(
   tar_target(
     mod.data.block,
     make_blockCV(mod.data,
-                 nfold=5)
+                 nfold=4)
   ),
   tar_target(
     sim.plan,
     data.frame(model=c("nul","system","origin","systori","complete")) |> 
-      crossing(fold=1:5)
+      crossing(fold=1:4)
   ),
   tar_target(
     id.sim,
