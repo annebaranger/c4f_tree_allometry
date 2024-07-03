@@ -682,6 +682,8 @@ make_model<-function(sim.plan,
                     data = data_nul,         # dataset
                     warmup = 1000,          # number of warmup iterations per chain
                     iter = 2000,
+                    include = FALSE,
+                    pars=c("gamma_plot","gamma_sp","log_lik"),
                     cores = 4)
     save(HD_nul,file=file_mod)
   }
@@ -705,7 +707,7 @@ make_model<-function(sim.plan,
                       warmup = 1000,
                       iter=2000,
                       include = FALSE,
-                      pars=c("gamma_plot","gamma_sp"),
+                      pars=c("gamma_plot","gamma_sp","log_lik"),
                       core=4)
     save(HD_origin,file=file_mod)
   }
@@ -728,7 +730,7 @@ make_model<-function(sim.plan,
                    warmup = 1000,
                    iter=2000,
                    include = FALSE,
-                   pars=c("gamma_plot","gamma_sp"),
+                   pars=c("gamma_plot","gamma_sp","log_lik"),
                    core=4)
     save(HD_system,file=file_mod)
   }
@@ -751,7 +753,7 @@ make_model<-function(sim.plan,
                    warmup = 1000,
                    iter=2000,
                    include = FALSE,
-                   pars=c("gamma_plot","gamma_sp"),
+                   pars=c("gamma_plot","gamma_sp","log_lik"),
                    core=4)
     save(HD_systori,file=file_mod)
   }
@@ -775,7 +777,7 @@ make_model<-function(sim.plan,
                      warmup = 1000,          # number of warmup iterations per chain
                      iter = 2000,
                      include = FALSE,
-                     pars=c("gamma_plot","gamma_sp"),
+                     pars=c("gamma_plot","gamma_sp","log_lik"),
                      core=4)   
     save(HD_complete,file=file_mod)
   }
