@@ -803,93 +803,90 @@ get_prediction<-function(spatial.cross.val,
   par_mod<- as.data.frame(mod_fit) |> 
     dplyr::select(!matches(c("log_lik","lp__"))) 
   
+  mod.test$mod=mod
   ## model nul
-  if(mod=="nul"){
-    n=dim(mod.test)[1]
-    for (i in 1:n){
-      print(i)
-      dbh=mod.test$dbh[i]
-      H=model_system(dbh,
-                     alpha=par_mod[["alpha_0"]],
-                     beta=par_mod[["beta_0"]],
-                     1,
-                     1)
-      mod.test$H_med[i]=median(H)
-      mod.test$H_q05[i]=quantile(H,probs=0.05)
-      mod.test$H_q95[i]=quantile(H,probs=0.95)
-    }
+
+  if (mod == "nul") {
+    dbh_values <- mod.test$dbh
+    
+    H <- mapply(function(dbh) {
+      model_nul(dbh,
+                   alpha = par_mod[["alpha_0"]],
+                   beta = par_mod[["beta_0"]],
+                   1,
+                   1)
+    }, dbh_values)
+    
+    mod.test$H_med2 <- apply(H, 2, median)
+    mod.test$H_q052 <- apply(H, 2, quantile, probs = 0.05)
+    mod.test$H_q952 <- apply(H, 2, quantile, probs = 0.95)
   }
   
   ## model origin
-  if(sim.plan$model[id.sim]=="origin"){
-    n=dim(mod.test)[1]
-    for (i in 1:n){
-      print(i)
-      cof=mod.test$ori[i]
-      dbh=mod.test$dbh[i]
-      H=model_origin(dbh,
-                     alpha_ori=par_mod[[paste0("alpha[",cof,"]")]],
-                     beta_ori=par_mod[[paste0("beta[",cof,"]")]],
+  if (mod == "origin") {
+    mod.test <- mod.test %>%
+      mutate(H_list = mapply(function(cof, dbh) {
+        model_origin(dbh,
+                     alpha_ori = par_mod[[paste0("alpha[", cof, "]")]],
+                     beta_ori = par_mod[[paste0("beta[", cof, "]")]],
                      1,
                      1)
-      mod.test$H_med[i]=median(H)
-      mod.test$H_q05[i]=quantile(H,probs=0.05)
-      mod.test$H_q95[i]=quantile(H,probs=0.95)
-    }
+      }, ori, dbh, SIMPLIFY = FALSE),
+      H_med2 = sapply(H_list, median),
+      H_q052 = sapply(H_list, quantile, probs = 0.05),
+      H_q952 = sapply(H_list, quantile, probs = 0.95)) %>%
+      select(-H_list)
   }
+  
   ## model system
-  if(sim.plan$model[id.sim]=="system"){
-    n=dim(mod.test)[1]
-    for (i in 1:n){
-      print(i)
-      cof=mod.test$sys[i]
-      dbh=mod.test$dbh[i]
-      H=model_system(dbh,
-                     alpha_sys=par_mod[[paste0("alpha[",cof,"]")]],
-                     beta_sys=par_mod[[paste0("beta[",cof,"]")]],
+  if (mod == "system") {
+    mod.test <- mod.test %>%
+      mutate(H_list = mapply(function(cof, dbh) {
+        model_system(dbh,
+                     alpha_sys = par_mod[[paste0("alpha[", cof, "]")]],
+                     beta_sys = par_mod[[paste0("beta[", cof, "]")]],
                      1,
                      1)
-      mod.test$H_med[i]=median(H)
-      mod.test$H_q05[i]=quantile(H,probs=0.05)
-      mod.test$H_q95[i]=quantile(H,probs=0.95)
-    }
+      }, sys, dbh, SIMPLIFY = FALSE),
+      H_med = sapply(H_list, median),
+      H_q05 = sapply(H_list, quantile, probs = 0.05),
+      H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
+      select(-H_list)
   }
+  
+  
   ## model system origin
-  if(sim.plan$model[id.sim]=="systori"){
-    n=dim(mod.test)[1]
-    for (i in 1:n){
-      print(i)
-      cof=mod.test$systori[i]
-      dbh=mod.test$dbh[i]
-      H=model_systori(dbh,
-                     alpha_systori=par_mod[[paste0("alpha[",cof,"]")]],
-                     beta_systori=par_mod[[paste0("beta[",cof,"]")]],
-                     1,
-                     1)
-      mod.test$H_med[i]=median(H)
-      mod.test$H_q05[i]=quantile(H,probs=0.05)
-      mod.test$H_q95[i]=quantile(H,probs=0.95)
-    }
+  if (mod == "systori") {
+    mod.test <- mod.test %>%
+      mutate(H_list = mapply(function(cof, dbh) {
+        model_systori(dbh,
+                      alpha_systori = par_mod[[paste0("alpha[", cof, "]")]],
+                      beta_systori = par_mod[[paste0("beta[", cof, "]")]],
+                      1,
+                      1)
+      }, systori, dbh, SIMPLIFY = FALSE),
+      H_med = sapply(H_list, median),
+      H_q05 = sapply(H_list, quantile, probs = 0.05),
+      H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
+      select(-H_list)
   }
+  
   ## model complete
-  if(mod=="complete"){
-    n=dim(mod.test)[1]
-    for (i in 1:n){
-      print(i)
-      cof=mod.test$systori[i]
-      dbh=mod.test$dbh[i]
-      ba=mod.test$ba_tot[i]
-      prec=mod.test$bio17[i]
-      H=model_complete(dbh,ba, prec, 
-                       alpha_sys=par_mod[[paste0("alpha[",cof,"]")]],
-                       beta_sys=par_mod[[paste0("beta[",cof,"]")]],
-                       beta_ba=par_mod[["beta_ba"]],
-                       beta_precmin=par_mod[["beta_precmin"]] )
-      mod.test$H_med[i]=median(H)
-      mod.test$H_q05[i]=quantile(H,probs=0.05)
-      mod.test$H_q95[i]=quantile(H,probs=0.95)
-    }
+  if (mod == "complete") {
+    mod.test <- mod.test %>%
+      mutate(H_list = mapply(function(cof, dbh, ba, prec) {
+        model_complete(dbh, ba, prec,
+                       alpha_sys = par_mod[[paste0("alpha[", cof, "]")]],
+                       beta_sys = par_mod[[paste0("beta[", cof, "]")]],
+                       beta_ba = par_mod[["beta_ba"]],
+                       beta_precmin = par_mod[["beta_precmin"]])
+      }, systori, dbh, ba_tot, bio17, SIMPLIFY = FALSE),
+      H_med = sapply(H_list, median),
+      H_q05 = sapply(H_list, quantile, probs = 0.05),
+      H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
+      select(-H_list)
   }
+  return(mod.test)
 }
 # 
 # library(ggplot2)

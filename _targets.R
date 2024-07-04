@@ -171,5 +171,14 @@ list(
     iteration="vector",
     format="file"
   ),
+  tar_target(
+    predict_spatial_crossval,
+    get_prediction(spatial.cross.val,
+                   sim.plan,
+                   id.sim,
+                   mod.data.block),
+    pattern=map(id.sim),
+    iteration="vector"
+  ),
   NULL
 )
