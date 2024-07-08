@@ -32,29 +32,44 @@ loadRData <- function(fileName){
   get(ls()[ls() != "fileName"])
 }
 
-model_nul <- function(x,alpha,beta,gamma_sp,gamma_plot) {
-  gamma_sp*gamma_plot*(alpha * x)/ 
-    (beta + x)
+model_nul <- function(x,ba=NA,precmin=NA,
+                      alpha_cof,beta_cof,
+                      beta_ba=NA,beta_precmin=NA,
+                      gamma_sp,gamma_plot) {
+  gamma_sp*gamma_plot*(alpha_cof * x)/ 
+    (beta_cof + x)
 }
 
-model_origin <- function(x,alpha_ori,beta_ori,gamma_sp,gamma_plot){
-  gamma_sp*gamma_plot*(alpha_ori * x)/ 
-    (beta_ori+x)
+model_origin <- function(x,ba=NA,precmin=NA,
+                         alpha_cof,beta_cof,
+                         beta_ba=NA,beta_precmin=NA,
+                         gamma_sp,gamma_plot){
+  gamma_sp*gamma_plot*(alpha_cof * x)/ 
+    (beta_cof+x)
 }
 
-model_system <- function(x,alpha_sys,beta_sys,gamma_sp,gamma_plot){
-  gamma_sp*gamma_plot*(alpha_sys * x)/ 
-    (beta_sys+x)
+model_system <- function(x,ba=NA,precmin=NA,
+                         alpha_cof,beta_cof,
+                         beta_ba=NA,beta_precmin=NA,
+                         gamma_sp,gamma_plot){
+  gamma_sp*gamma_plot*(alpha_cof * x)/ 
+    (beta_cof+x)
 }
 
-model_systori <- function(x,alpha_systori,beta_systori,gamma_sp,gamma_plot){
-  gamma_sp*gamma_plot*(alpha_systori * x)/ 
-    (beta_systori + x)
+model_systori <- function(x,ba=NA,precmin=NA,
+                          alpha_cof,beta_cof,
+                          beta_ba=NA,beta_precmin=NA,
+                          gamma_sp,gamma_plot){
+  gamma_sp*gamma_plot*(alpha_cof * x)/ 
+    (beta_cof + x)
 }
 
-model_complete <- function(x,ba,precmin,alpha_sys,beta_sys,beta_ba,beta_precmin){
-   alpha_sys * x /
-    (beta_sys*(ba^beta_ba) * (precmin^beta_precmin) + x)}
+model_complete <- function(x,ba,precmin,
+                           alpha_cof,beta_cof,
+                           beta_ba,beta_precmin,
+                           gamma_sp,gamma_plot){
+  alpha_cof * x /
+    (beta_cof*(ba^beta_ba) * (precmin^beta_precmin) + x)}
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 1 - data fit ####
@@ -811,10 +826,13 @@ get_prediction<-function(spatial.cross.val,
     
     H <- mapply(function(dbh) {
       model_nul(dbh,
-                   alpha = par_mod[["alpha_0"]],
-                   beta = par_mod[["beta_0"]],
-                   1,
-                   1)
+                ba=NA,precmin=NA,
+                alpha_cof = par_mod[["alpha_0"]],
+                beta_cof = par_mod[["beta_0"]],
+                beta_ba=NA,
+                beta_precmin=NA,
+                1,
+                1)
     }, dbh_values)
     
     mod.test$H_med2 <- apply(H, 2, median)
@@ -827,8 +845,11 @@ get_prediction<-function(spatial.cross.val,
     mod.test <- mod.test %>%
       mutate(H_list = mapply(function(cof, dbh) {
         model_origin(dbh,
-                     alpha_ori = par_mod[[paste0("alpha[", cof, "]")]],
-                     beta_ori = par_mod[[paste0("beta[", cof, "]")]],
+                     ba=NA,precmin=NA,
+                     alpha_cof = par_mod[[paste0("alpha[", cof, "]")]],
+                     beta_cof = par_mod[[paste0("beta[", cof, "]")]],
+                     beta_ba=NA,
+                     beta_precmin=NA,
                      1,
                      1)
       }, ori, dbh, SIMPLIFY = FALSE),
@@ -843,8 +864,11 @@ get_prediction<-function(spatial.cross.val,
     mod.test <- mod.test %>%
       mutate(H_list = mapply(function(cof, dbh) {
         model_system(dbh,
-                     alpha_sys = par_mod[[paste0("alpha[", cof, "]")]],
-                     beta_sys = par_mod[[paste0("beta[", cof, "]")]],
+                     ba=NA,precmin=NA,
+                     alpha_cof = par_mod[[paste0("alpha[", cof, "]")]],
+                     beta_cof = par_mod[[paste0("beta[", cof, "]")]],
+                     beta_ba=NA,
+                     beta_precmin=NA,
                      1,
                      1)
       }, sys, dbh, SIMPLIFY = FALSE),
@@ -860,8 +884,11 @@ get_prediction<-function(spatial.cross.val,
     mod.test <- mod.test %>%
       mutate(H_list = mapply(function(cof, dbh) {
         model_systori(dbh,
-                      alpha_systori = par_mod[[paste0("alpha[", cof, "]")]],
-                      beta_systori = par_mod[[paste0("beta[", cof, "]")]],
+                      ba=NA,precmin=NA,
+                      alpha_cof = par_mod[[paste0("alpha[", cof, "]")]],
+                      beta_cof = par_mod[[paste0("beta[", cof, "]")]],
+                      beta_ba=NA,
+                      beta_precmin=NA,
                       1,
                       1)
       }, systori, dbh, SIMPLIFY = FALSE),
@@ -876,10 +903,12 @@ get_prediction<-function(spatial.cross.val,
     mod.test <- mod.test %>%
       mutate(H_list = mapply(function(cof, dbh, ba, prec) {
         model_complete(dbh, ba, prec,
-                       alpha_sys = par_mod[[paste0("alpha[", cof, "]")]],
-                       beta_sys = par_mod[[paste0("beta[", cof, "]")]],
+                       alpha_cof = par_mod[[paste0("alpha[", cof, "]")]],
+                       beta_cof = par_mod[[paste0("beta[", cof, "]")]],
                        beta_ba = par_mod[["beta_ba"]],
-                       beta_precmin = par_mod[["beta_precmin"]])
+                       beta_precmin = par_mod[["beta_precmin"]],
+                       1,
+                       1)
       }, systori, dbh, ba_tot, bio17, SIMPLIFY = FALSE),
       H_med = sapply(H_list, median),
       H_q05 = sapply(H_list, quantile, probs = 0.05),
@@ -906,10 +935,10 @@ get_global_fit<-function(sim.plan,
     mutate(cof=case_when(model%in% c("complete","systori")~"systori",
                          model=="nul"~"nul",
                          model=="system"~"sys",
-                         model=="origine"~"ori"))
+                         model=="origin"~"ori"))
   col_number=if_else(mod=="nul",5,
-                    if_else(mod=="ori",13,
-                            if_else(mod=="sys",15,
+                    if_else(mod=="origin",13,
+                            if_else(mod=="system",15,
                                     if_else(mod=="systori",21,
                                             if_else(mod=="complete",23,NA)))))
   fit_df<-as.data.frame(matrix(nrow=0,ncol=col_number))
@@ -928,14 +957,22 @@ get_global_fit<-function(sim.plan,
     colnames(fit_df) <- str_replace_all(colnames(fit_df), replacement_vector)
   }
   
+  
+  model<-eval(parse(text=paste0("model_",mod)))
+  beta_ba=if(exists("beta_ba",where=fit_df)){fit_df$beta_ba}else{NA}
+  beta_precmin=if(exists("beta_precmin",where=fit_df)){fit_df$beta_precmin}else{NA}
   trajectory<-cor_tab |> 
     tidyr::crossing(dbh = seq(0, 200, 1)) |> 
     mutate(H_list = mapply(function(corr, dbh) {
-      model_systori(dbh,
-                    alpha_systori = fit_df[[paste0("alpha_", corr)]],
-                    beta_systori = fit_df[[paste0("beta_", corr)]],
-                    1,
-                    1)
+      model(dbh,
+            ba=if_else(mod=="complete",20,NA),
+            precmin=if_else(mod=="complete",200,NA),
+            alpha_cof = fit_df[[paste0("alpha_", corr)]],
+            beta_cof = fit_df[[paste0("beta_", corr)]],
+            beta_ba=beta_ba,
+            beta_precmin=beta_precmin,
+            gamma_sp=1,
+            gamma_plot=1)
     }, corr, dbh, SIMPLIFY = FALSE),
     H_med = sapply(H_list, median),
     H_q05 = sapply(H_list, quantile, probs = 0.05),
@@ -943,5 +980,6 @@ get_global_fit<-function(sim.plan,
     select(-H_list)
 
 
-  return(fit_df)
+  return(list(fit_df=fit_df,
+              trajectory=trajectory))
 }

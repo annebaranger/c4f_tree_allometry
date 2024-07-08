@@ -14,8 +14,20 @@ lapply(c("stringr","tidyr","dplyr","tibble", # data analysis
          ),require,character.only=TRUE)
 ```
 
-# Trajectories
+# Trajectories with systori model
 
+```{r}
+traj<-tar_read(global_fit_systori)$trajectory
+tar_load(mod.data)
+ggplot(data=traj)+
+  geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.2)+
+  geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=system),fill="grey",alpha=0.5)+
+  geom_line(aes(dbh,H_med,group=system,color=system))+
+  facet_wrap(~origin)+
+  scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  scale_y_log10()
+```
 
 # Biomass predictions
 
@@ -38,10 +50,15 @@ predict_spatial_crossval$AGBobs<- computeAGB(D = predict_spatial_crossval$dbh,
 predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
                                               WD = dataWD$meanWD,
                                               H = predict_spatial_crossval$H_med)
+Hpred_chave <- computeAGB(D = predict_spatial_crossval$dbh,
+                                              WD = dataWD$meanWD,
+                                              H = predict_spatial_crossval$H_med)
 predict_spatial_crossval |> 
   mutate(dh=(H-H_med)/H,
          dAGB=100*(AGBobs-AGBpred)/AGBobs,
          mod=factor(mod,levels=c("nul","origin","system","systori","complete"))) |> 
+  filter(H>1) |> 
+  filter(!(H<2&dbh>7.5)) |>
   filter(dh>(-10)) |> 
   ggplot(aes(mod,dAGB))+
   geom_boxplot()+

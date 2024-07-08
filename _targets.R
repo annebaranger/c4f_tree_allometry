@@ -172,6 +172,21 @@ list(
     format="file"
   ),
   tar_target(
+    correspondance_table,
+    mod.data |> 
+      select(systori,sys,ori,system,origin) |> 
+      mutate(system_origin=paste0(str_sub(system,1,3),"_",str_sub(origin,1,3))) |> 
+      unique() |> 
+      pivot_longer(cols=c("systori","sys","ori"),names_to = "cof",values_to = "num") |> 
+      mutate(corr=case_when(cof=="systori"~system_origin,
+                            cof=="sys"~str_sub(system,1,3),
+                            cof=="ori"~str_sub(origin,1,3)),
+             system = if_else(cof %in% c("systori", "sys"), system, NA_character_),
+             origin = if_else(cof %in% c("systori", "ori"), origin, NA_character_)) |> 
+      select(cof,num,corr,system,origin) |> 
+      unique()
+  ),
+  tar_target(
     predict_spatial_crossval,
     get_prediction(spatial.cross.val,
                    sim.plan,
@@ -179,6 +194,13 @@ list(
                    mod.data.block),
     pattern=map(id.sim),
     iteration="vector"
+  ),
+  tar_target(
+    global_fit_systori,
+    get_global_fit(sim.plan,
+                   spatial.cross.val,
+                   correspondance_table,
+                   mod="systori")
   ),
   NULL
 )
