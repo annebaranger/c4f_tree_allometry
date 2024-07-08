@@ -1,0 +1,52 @@
+---
+title: "figures"
+author: "Anne Baranger"
+date: "2024-07-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+lapply(c("stringr","tidyr","dplyr","tibble", # data analysis
+         "ggplot2","viridis", # plot
+         "rstan","shinystan","BIOMASS",# stat & models
+         "rworldmap" # geographic data #terre, sf
+         ),require,character.only=TRUE)
+```
+
+# Trajectories
+
+
+# Biomass predictions
+
+## Data
+```{r}
+predict_spatial_crossval<-tar_read(predict_spatial_crossval) |> 
+  mutate(H_med=case_when(mod%in%c("nul","origin")~H_med2,
+                         TRUE~H_med),
+         H_q05=case_when(mod%in%c("nul","origin")~H_q052,
+                         TRUE~H_q05),
+         H_q95=case_when(mod%in%c("nul","origin")~H_q952,
+                         TRUE~H_q95))
+dataWD <- getWoodDensity(
+  genus = predict_spatial_crossval$genusCorr,
+  species = predict_spatial_crossval$speciesCorr,
+  stand = predict_spatial_crossval$id_plot)
+predict_spatial_crossval$AGBobs<- computeAGB(D = predict_spatial_crossval$dbh,
+                                             WD = dataWD$meanWD,
+                                             H = predict_spatial_crossval$H)
+predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
+                                              WD = dataWD$meanWD,
+                                              H = predict_spatial_crossval$H_med)
+predict_spatial_crossval |> 
+  mutate(dh=(H-H_med)/H,
+         dAGB=100*(AGBobs-AGBpred)/AGBobs,
+         mod=factor(mod,levels=c("nul","origin","system","systori","complete"))) |> 
+  filter(dh>(-10)) |> 
+  ggplot(aes(mod,dAGB))+
+  geom_boxplot()+
+  geom_hline(yintercept=0)+
+  theme_light()+
+  facet_wrap(~system)
+```
+

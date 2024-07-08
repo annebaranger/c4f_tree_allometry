@@ -888,26 +888,60 @@ get_prediction<-function(spatial.cross.val,
   }
   return(mod.test)
 }
-# 
-# library(ggplot2)
-# mod.test |> 
-#   ggplot(aes(dbh,H_med,color=system))+
-#   geom_point()+
-#   facet_wrap(~origin)
-# mod.test |> 
-#   mutate(delta=(H-H_med)/H) |> 
-#   ggplot(aes(delta,color=system))+
-#   geom_density()
-# dataWD <- getWoodDensity(
-#   genus = mod.test$genusCorr,
-#   species = mod.test$speciesCorr,
-#   stand = mod.test$id_plot)
-# mod.test$AGBobs<- computeAGB(D = mod.test$dbh,
-#                              WD = dataWD$meanWD,
-#                              H = mod.test$H)
-# mod.test$AGBpred<- computeAGB(D = mod.test$dbh,
-#                     WD = dataWD$meanWD,
-#                     H = mod.test$H_med)
-# mod.test |> 
-#   mutate(dAGB=100*(AGBobs-AGBpred)/AGBobs) |> 
-#   ggplot(aes(dAGB,color=system))+geom_density()
+
+
+
+#' Get one model fit
+#' @param sim.plan table with all model to run on which dataset
+#' @param spatial.cross.val id of the model x dataset to run
+#' @param mod
+
+get_global_fit<-function(sim.plan,
+                         spatial.cross.val,
+                         correspondance_table,
+                         mod){
+  sim.plan<- sim.plan |> 
+    mutate(id=row_number()) |> 
+    filter(model==mod) |> 
+    mutate(cof=case_when(model%in% c("complete","systori")~"systori",
+                         model=="nul"~"nul",
+                         model=="system"~"sys",
+                         model=="origine"~"ori"))
+  col_number=if_else(mod=="nul",5,
+                    if_else(mod=="ori",13,
+                            if_else(mod=="sys",15,
+                                    if_else(mod=="systori",21,
+                                            if_else(mod=="complete",23,NA)))))
+  fit_df<-as.data.frame(matrix(nrow=0,ncol=col_number))
+  for (i in sim.plan$id){
+    print(i)
+    fit<-loadRData(spatial.cross.val[i])
+    fit_df<- rbind(fit_df,
+                   as.data.frame(fit) |> 
+                     dplyr::select(!matches(c("log_lik","lp__"))) )
+  }
+  colnames(fit_df)<-str_replace_all(colnames(fit_df),pattern = "\\[|\\]",replacement = "")
+  if (unique(sim.plan$cof)!="nul"){
+    cor_tab=correspondance_table |> 
+      filter(cof==unique(sim.plan$cof))
+    replacement_vector <- setNames(paste0("_", cor_tab$corr), cor_tab$num)
+    colnames(fit_df) <- str_replace_all(colnames(fit_df), replacement_vector)
+  }
+  
+  trajectory<-cor_tab |> 
+    tidyr::crossing(dbh = seq(0, 200, 1)) |> 
+    mutate(H_list = mapply(function(corr, dbh) {
+      model_systori(dbh,
+                    alpha_systori = fit_df[[paste0("alpha_", corr)]],
+                    beta_systori = fit_df[[paste0("beta_", corr)]],
+                    1,
+                    1)
+    }, corr, dbh, SIMPLIFY = FALSE),
+    H_med = sapply(H_list, median),
+    H_q05 = sapply(H_list, quantile, probs = 0.05),
+    H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
+    select(-H_list)
+
+
+  return(fit_df)
+}
