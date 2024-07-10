@@ -5,7 +5,7 @@ library(targets)
 tar_option_set(
   packages = c("dplyr","tidyr","stringr",#"readxl","BIOMASS",
                "sf","terra",
-               "rstan","loo","blockCV",
+               "rstan","loo","blockCV",#"dbscan",
                "future"), # packages that your targets need to run
   format = "rds", # default storage format
   memory="transient"
@@ -82,6 +82,13 @@ list(
   
   # Fit models
   tar_target(
+    mod.data.all,
+    data.fit(tree,
+             plot,
+             frac=1,
+             ba_require=FALSE)
+  ),
+  tar_target(
     mod.data,
     data.fit(tree,
              plot,
@@ -143,19 +150,35 @@ list(
                list.names=c("mat","mtwm","map","mpdq","vcomp","ba","complete"))
   ),
   tar_target(
-    list.subdataset,
-    make_subdataset(mod.data,
-                    folder="rds/")
+    subdata_fit_systori,
+    get_subdata_fit(data=sub.mod.data.3.ba,
+                    model_file="mod_cov_select/nul_systori.rdata",
+                    model_type="systori",
+                    model_function="model_systori",
+                    correspondance_table)
+  ),
+  # tar_target(
+  #   list.subdataset,
+  #   make_subdataset(mod.data,
+  #                   folder="rds/")
+  # ),
+  # tar_target(
+  #   mod.data.block,
+  #   make_blockCV(mod.data,
+  #                nfold=4)
+  # ),
+  tar_target(
+    mod.data.dbscan,
+    make_dbscan(mod.data.all)
   ),
   tar_target(
-    mod.data.block,
-    make_blockCV(mod.data,
-                 nfold=4)
+    mod.data.ba.dbscan,
+    make_dbscan(mod.data)
   ),
   tar_target(
     sim.plan,
-    data.frame(model=c("nul","system","origin","systori","complete")) |> 
-      crossing(fold=1:4)
+    make_sim_plan(mod.data.dbscan,
+                  mod.data.ba.dbscan)
   ),
   tar_target(
     id.sim,
@@ -165,7 +188,8 @@ list(
     spatial.cross.val,
     make_model(sim.plan,
                id.sim,
-               mod.data.block,
+               mod.data.dbscan,
+               mod.data.ba.dbscan,
                folder="mod_spatial_cross_valid/"),
     pattern=map(id.sim),
     iteration="vector",
@@ -191,7 +215,8 @@ list(
     get_prediction(spatial.cross.val,
                    sim.plan,
                    id.sim,
-                   mod.data.block),
+                   mod.data.dbscan,
+                   mod.data.ba.dbscan),
     pattern=map(id.sim),
     iteration="vector"
   ),

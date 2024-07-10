@@ -96,7 +96,7 @@ data.fit<-function(tree,
     filter(!(H==1&dbh>5)) %>% # filter weird tree
     filter(!(H<15&dbh>100)) %>%
     filter(dbh<200) %>% 
-    filter(is.na(ba_tot)==FALSE) %>%
+    # filter(is.na(ba_tot)==FALSE) %>%
     filter(is.na(bio01)==FALSE) %>%
     filter(!is.na(origin)) |> 
     filter(!is.na(system)) |> 
@@ -589,6 +589,75 @@ load.rename<-function(dir.object,new_name){
 }
 
 
+#' Get one model fit, for subdata
+#' @param mod.file table with all model to run on which dataset
+#' @param spatial.cross.val id of the model x dataset to run
+#' @param mod
+
+get_subdata_fit<-function(data=tar_read(sub.mod.data.3.ba),
+                          model_file="mod_cov_select/nul_systori.rdata",
+                          model_type="systori",
+                          model_function="model_systori",
+                          correspondance_table){
+  model<-eval(parse(text=model_function))
+  
+  fit<-loadRData(model_file)
+  fit_df<-as.data.frame(fit) |> 
+    dplyr::select(!matches(c("log_lik","lp__"))) 
+
+  colnames(fit_df)<-str_replace_all(colnames(fit_df),pattern = "\\[|\\]",replacement = "")
+  if (model_type!="nul"){
+    cor_tab=correspondance_table |> 
+      filter(cof==model_type)
+    replacement_vector <- setNames(paste0("_", cor_tab$corr), cor_tab$num)
+    colnames(fit_df) <- str_replace_all(colnames(fit_df), replacement_vector)
+  }
+  
+  beta_ba=if(exists("beta_ba",where=fit_df)){fit_df$beta_ba}else{NA}
+  beta_precmin=if(exists("beta_precmin",where=fit_df)){fit_df$beta_precmin}else{NA}
+  trajectory<-cor_tab |> 
+    tidyr::crossing(dbh = seq(0, 200, 1)) |> 
+    mutate(H_list = mapply(function(corr, dbh) {
+      model(dbh,
+            ba=if_else(model_type=="complete",20,NA),
+            precmin=if_else(model_type=="complete",200,NA),
+            alpha_cof = fit_df[[paste0("alpha_", corr)]],
+            beta_cof = fit_df[[paste0("beta_", corr)]],
+            beta_ba=beta_ba,
+            beta_precmin=beta_precmin,
+            gamma_sp=1,
+            gamma_plot=1)
+    }, corr, dbh, SIMPLIFY = FALSE),
+    H_med = sapply(H_list, median),
+    H_q05 = sapply(H_list, quantile, probs = 0.05),
+    H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
+    select(-H_list)
+  
+  
+  data_pred <- data %>%
+    left_join(correspondance_table) |> 
+    mutate(H_list = mapply(function(corr, dbh) {
+      model(dbh,
+            ba=if_else(model_type=="complete",20,NA),
+            precmin=if_else(model_type=="complete",200,NA),
+            alpha_cof = fit_df[[paste0("alpha_", corr)]],
+            beta_cof = fit_df[[paste0("beta_", corr)]],
+            beta_ba=beta_ba,
+            beta_precmin=beta_precmin,
+            gamma_sp=1,
+            gamma_plot=1)
+    }, corr, dbh, SIMPLIFY = FALSE),
+    H_med = sapply(H_list, median),
+    H_q05 = sapply(H_list, quantile, probs = 0.05),
+    H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
+    select(-H_list)
+  
+  
+  return(list(fit_df=fit_df,
+              trajectory=trajectory,
+              data_pred=data_pred))
+}
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 4 - spatial cross validation ####
 #' @author Anne Baranger (INRAE - LESSEM)
@@ -656,13 +725,47 @@ make_subdataset<-function(mod.data,
 #' @param folder folder path
 
 make_blockCV<-function(mod.data,
-                       nfold=5){
+                       nfold=25){
   point_data <- sf::st_as_sf(mod.data, coords = c("long", "lat"), crs = 4326)
   scv <- cv_cluster(x = point_data,
                     column = "sys", # optional: counting number of train/test records
                     k = nfold)
   
   return(cbind(mod.data,fold=scv$folds_ids))
+}
+
+
+#' Create blocks for spatial cross-validation
+#' @note use dbscan package
+#' @param mod.data
+#' @param eps parameter of dbscan algo
+#' @param minPts parameter of dbscan algo
+
+make_dbscan<-function(mod.data,
+                      eps=0.3,
+                      minPts=10){
+  dbscan_result <- dbscan(as.matrix(mod.data[,c("long","lat")]), eps = eps, minPts = minPts)
+  mod.data$cluster <- as.factor(dbscan_result$cluster)
+  
+  
+  return(mod.data)
+}
+
+#' Make a table for model fit plan
+#'@param mod.data.dbscan first dataset
+#'@param mod.data.ba.dbscan second dataset
+make_sim_plan<-function(mod.data.dbscan,
+                        mod.data.ba.dbscan){
+  sim.plan<-data.frame(model=c("nul_mod","system","origin","systori","complete"),
+                       data=c(rep("mod.data.dbscan",4),"mod.data.ba.dbscan")) |> 
+    rowwise() |> 
+    mutate(ncluster=max(as.numeric(eval(parse(text=data))$cluster))) |>
+    uncount(ncluster) |> 
+    group_by(model,data) |> 
+    mutate(cluster=row_number()) |> 
+    ungroup()
+  return(sim.plan)
+  
 }
 
 #' Fit model on a subselection of the dataset
@@ -673,17 +776,19 @@ make_blockCV<-function(mod.data,
 
 make_model<-function(sim.plan,
                      id.sim,
-                     mod.data.block,
+                     mod.data.dbscan,
+                     mod.data.ba.dbscan,
                      folder="mod_spatial_cross_valid/"){
   print(id.sim)
-  file_data=paste0(folder,"subdata_",sim.plan$fold[id.sim])
-  file_mod=paste0(file_data,"/",sim.plan$model[id.sim],".RData")
+  file_data=paste0(folder,"subdata_",sim.plan$cluster[id.sim])
+  file_mod=paste0(file_data,"_",sim.plan$model[id.sim],".RData")
   if(!dir.exists(folder))dir.create(folder)
   if(!dir.exists(file_data))dir.create(file_data)
-  mod.fold=mod.data.block[mod.data.block$fold!=sim.plan$fold[id.sim],]
+  data=eval(parse(text=sim.plan$data[id.sim]))
+  mod.fold=data[data$cluster!=sim.plan$cluster[id.sim],]
   
   ## model nul
-  if(sim.plan$model[id.sim]=="nul"){
+  if(sim.plan$model[id.sim]=="nul_mod"){
     data_nul = list(
       N = dim(mod.fold)[1],
       p =nlevels(mod.fold$id_plot),
@@ -808,12 +913,14 @@ make_model<-function(sim.plan,
 get_prediction<-function(spatial.cross.val,
                          sim.plan,
                          id.sim,
-                         mod.data.block){
+                         mod.data.dbscan,
+                         mod.data.ba.dbscan){
   print(id.sim)
   file_mod=spatial.cross.val[id.sim]
   mod=sim.plan$model[id.sim]
-  mod.train=mod.data.block[mod.data.block$fold!=sim.plan$fold[id.sim],]
-  mod.test=mod.data.block[mod.data.block$fold==sim.plan$fold[id.sim],]
+  data=eval(parse(text=sim.plan$data[id.sim]))
+  mod.train=data[data$cluster!=sim.plan$cluster[id.sim],]
+  mod.test=data[data$cluster==sim.plan$cluster[id.sim],]
   mod_fit=loadRData(file_mod)
   par_mod<- as.data.frame(mod_fit) |> 
     dplyr::select(!matches(c("log_lik","lp__"))) 

@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 lapply(c("stringr","tidyr","dplyr","tibble", # data analysis
-         "ggplot2","viridis", # plot
+         "ggplot2","viridis","ggridges", # plot
          "rstan","shinystan","BIOMASS",# stat & models
          "rworldmap" # geographic data #terre, sf
          ),require,character.only=TRUE)
@@ -16,30 +16,135 @@ lapply(c("stringr","tidyr","dplyr","tibble", # data analysis
 
 # Trajectories with systori model
 
+## With global fits concatenation
 ```{r}
 traj<-tar_read(global_fit_systori)$trajectory
+fit<-tar_read(global_fit_systori)$fit_df
 tar_load(mod.data)
-ggplot(data=traj)+
-  geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.2)+
+tar_load(correspondance_table)
+trajectories<-ggplot(data=traj)+
+  geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.1)+
   geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=system),fill="grey",alpha=0.5)+
   geom_line(aes(dbh,H_med,group=system,color=system))+
   facet_wrap(~origin)+
   scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
                      values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
-  scale_y_log10()
+  scale_y_log10()+
+  theme(legend.position = "top")+
+  labs(color="System")
+alpha<-fit |> 
+  select(matches("alpha")&!matches("_0")) |> 
+  pivot_longer(cols=everything()) |> 
+  mutate(name=str_replace(name,"alpha_",""))|>
+  left_join(correspondance_table,by=c("name"="corr")) |> 
+  mutate(system=ordered(system,
+                        levels=c("forest","secondary_forest","plantation","agroforestry"))) |> 
+  ggplot(aes(value,system,fill=system))+
+  geom_density_ridges(scale=0.8)+
+  scale_fill_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  facet_wrap(~origin)+
+  theme(axis.text.y = element_text(color="white",angle=90),
+        axis.ticks.y = element_line(color="white"))+
+  theme(legend.position = "none")+
+  labs(y="",x="Alpha value")
+beta<-fit |> 
+  select(matches("beta")&!matches("_0")) |> 
+  pivot_longer(cols=everything()) |> 
+  mutate(name=str_replace(name,"beta_","")) |> 
+  left_join(correspondance_table,by=c("name"="corr")) |> 
+  mutate(system=ordered(system,
+                        levels=c("forest","secondary_forest","plantation","agroforestry"))) |>
+  ggplot(aes(value,system,fill=system))+
+  geom_density_ridges(scale=0.8)+
+  scale_fill_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  facet_wrap(~origin)+
+  theme(axis.text.y = element_text(color="white",angle=90),
+        axis.ticks.y = element_line(color="white"))+
+  theme(legend.position = "none")+
+  labs(y="",x="Beta value")
+cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
+```
+## With fit from subdataset
+
+```{r}
+traj_sub<-tar_read(subdata_fit_systori)$trajectory
+fit_sub<-tar_read(subdata_fit_systori)$fit_df
+tar_load(mod.data)
+tar_load(correspondance_table)
+trajectories<-ggplot(data=traj_sub)+
+  geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.1)+
+  geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=system),fill="grey",alpha=0.5)+
+  geom_line(aes(dbh,H_med,group=system,color=system))+
+  facet_wrap(~origin)+
+  scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  scale_y_log10()+
+  theme(legend.position = "top")+
+  labs(color="System")
+alpha<-fit_sub |> 
+  select(matches("alpha")&!matches("_0")) |> 
+  pivot_longer(cols=everything()) |> 
+  mutate(name=str_replace(name,"alpha_",""))|>
+  left_join(correspondance_table,by=c("name"="corr")) |> 
+  mutate(system=ordered(system,
+                        levels=c("forest","secondary_forest","plantation","agroforestry"))) |> 
+  ggplot(aes(value,system,fill=system))+
+  geom_density_ridges(scale=0.8)+
+  scale_fill_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  facet_wrap(~origin)+
+  theme(axis.text.y = element_text(color="white",angle=90),
+        axis.ticks.y = element_line(color="white"))+
+  theme(legend.position = "none")+
+  labs(y="",x="Alpha value")
+beta<-fit_sub |> 
+  select(matches("beta")&!matches("_0")) |> 
+  pivot_longer(cols=everything()) |> 
+  mutate(name=str_replace(name,"beta_","")) |> 
+  left_join(correspondance_table,by=c("name"="corr")) |> 
+  mutate(system=ordered(system,
+                        levels=c("forest","secondary_forest","plantation","agroforestry"))) |>
+  ggplot(aes(value,system,fill=system))+
+  geom_density_ridges(scale=0.8)+
+  scale_fill_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
+                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  facet_wrap(~origin)+
+  theme(axis.text.y = element_text(color="white",angle=90),
+        axis.ticks.y = element_line(color="white"))+
+  theme(legend.position = "none")+
+  labs(y="",x="Beta value")
+cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
 ```
 
 # Biomass predictions
 
-## Data
 ```{r}
+predict_fit_systori<-tar_read(subdata_fit_systori)$data_pred |> 
+  select(!c(cof,num,corr)) |> mutate(mod="systori_sub")
+dataWD <- getWoodDensity(
+  genus = predict_fit_systori$genusCorr,
+  species = predict_fit_systori$speciesCorr,
+  stand = predict_fit_systori$id_plot)
+predict_fit_systori$AGBobs<- computeAGB(D = predict_fit_systori$dbh,
+                                             WD = dataWD$meanWD,
+                                             H = predict_fit_systori$H)
+predict_fit_systori$AGBpred<- computeAGB(D = predict_fit_systori$dbh,
+                                              WD = dataWD$meanWD,
+                                              H = predict_fit_systori$H_med)
+# Hpred_chave <- computeAGB(D = predict_fit_systori$dbh,
+                                              # WD = dataWD$meanWD,
+                                              # H = predict_fit_systori$H_med)
+
 predict_spatial_crossval<-tar_read(predict_spatial_crossval) |> 
   mutate(H_med=case_when(mod%in%c("nul","origin")~H_med2,
                          TRUE~H_med),
          H_q05=case_when(mod%in%c("nul","origin")~H_q052,
                          TRUE~H_q05),
          H_q95=case_when(mod%in%c("nul","origin")~H_q952,
-                         TRUE~H_q95))
+                         TRUE~H_q95)) |> 
+  select(!c(H_med2,H_q052,H_q952))
 dataWD <- getWoodDensity(
   genus = predict_spatial_crossval$genusCorr,
   species = predict_spatial_crossval$speciesCorr,
@@ -53,17 +158,46 @@ predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
 Hpred_chave <- computeAGB(D = predict_spatial_crossval$dbh,
                                               WD = dataWD$meanWD,
                                               H = predict_spatial_crossval$H_med)
-predict_spatial_crossval |> 
+rbind(predict_spatial_crossval) |> 
   mutate(dh=(H-H_med)/H,
+         sep_h=abs(H_med-H),
          dAGB=100*(AGBobs-AGBpred)/AGBobs,
          mod=factor(mod,levels=c("nul","origin","system","systori","complete"))) |> 
   filter(H>1) |> 
   filter(!(H<2&dbh>7.5)) |>
   filter(dh>(-10)) |> 
-  ggplot(aes(mod,dAGB))+
+  ggplot(aes(as.factor(fold),sep_h,fill=mod))+
   geom_boxplot()+
   geom_hline(yintercept=0)+
   theme_light()+
-  facet_wrap(~system)
+  facet_wrap(~system)+
+  ylim(c(-10,10))
+```
+
+# block map
+```{r}
+civ_map=sf::read_sf(dsn="data/civ/",
+                layer="COTE D'IVE")
+# Determine eps and minPts
+# You might need to experiment with different values to get around 23 clusters.
+eps <- 0.3  # example value for eps
+minPts <- 10  # example value for minPts
+points_sf <- st_as_sf(mod.data.all, coords = c("long", "lat"), crs = 4326)
+# Apply DBSCAN
+dbscan_result <- dbscan(as.matrix(mod.data.all[,c("long","lat")]), eps = eps, minPts = minPts)
+
+# Add cluster results to the dataframe
+mod.data.all$cluster <- as.factor(dbscan_result$cluster)
+
+mod.data.ba.dbscan |> 
+  select(lat,long,id_plot,system,cluster) |> unique() |> #filter(cluster%in%c(1:10)) |> 
+  ggplot()+
+  geom_jitter(aes(x=long,y=lat,color=as.factor(cluster)),width=0.05,height =0.05)
+cbind(mod.data.all,
+      fold=scv$folds_ids) |>
+  select(lat,long,id_plot,system,fold) |> unique() |> filter(fold%in%c(16,17)) |> 
+  ggplot()+
+  geom_jitter(aes(x=long,y=lat,color=as.factor(fold)),width=0.05,height =0.05)
+
 ```
 
