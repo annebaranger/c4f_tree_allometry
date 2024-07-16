@@ -928,7 +928,7 @@ get_prediction<-function(spatial.cross.val,
   mod.test$mod=mod
   ## model nul
 
-  if (mod == "nul") {
+  if (mod == "nul_mod") {
     dbh_values <- mod.test$dbh
     
     H <- mapply(function(dbh) {
@@ -942,9 +942,9 @@ get_prediction<-function(spatial.cross.val,
                 1)
     }, dbh_values)
     
-    mod.test$H_med2 <- apply(H, 2, median)
-    mod.test$H_q052 <- apply(H, 2, quantile, probs = 0.05)
-    mod.test$H_q952 <- apply(H, 2, quantile, probs = 0.95)
+    mod.test$H_med <- apply(H, 2, median)
+    mod.test$H_q05 <- apply(H, 2, quantile, probs = 0.05)
+    mod.test$H_q95 <- apply(H, 2, quantile, probs = 0.95)
   }
   
   ## model origin
@@ -960,9 +960,9 @@ get_prediction<-function(spatial.cross.val,
                      1,
                      1)
       }, ori, dbh, SIMPLIFY = FALSE),
-      H_med2 = sapply(H_list, median),
-      H_q052 = sapply(H_list, quantile, probs = 0.05),
-      H_q952 = sapply(H_list, quantile, probs = 0.95)) %>%
+      H_med = sapply(H_list, median),
+      H_q05 = sapply(H_list, quantile, probs = 0.05),
+      H_q95 = sapply(H_list, quantile, probs = 0.95)) %>%
       select(-H_list)
   }
   

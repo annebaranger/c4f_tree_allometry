@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-lapply(c("stringr","tidyr","dplyr","tibble", # data analysis
+lapply(c("targets","stringr","tidyr","dplyr","tibble", # data analysis
          "ggplot2","viridis","ggridges", # plot
          "rstan","shinystan","BIOMASS",# stat & models
          "rworldmap" # geographic data #terre, sf
@@ -122,7 +122,7 @@ cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
 
 ```{r}
 predict_fit_systori<-tar_read(subdata_fit_systori)$data_pred |> 
-  select(!c(cof,num,corr)) |> mutate(mod="systori_sub")
+  select(!c(cof,num,corr)) |> mutate(mod="systori_sub",cluster=as.factor(0))
 dataWD <- getWoodDensity(
   genus = predict_fit_systori$genusCorr,
   species = predict_fit_systori$speciesCorr,
@@ -138,11 +138,11 @@ predict_fit_systori$AGBpred<- computeAGB(D = predict_fit_systori$dbh,
                                               # H = predict_fit_systori$H_med)
 
 predict_spatial_crossval<-tar_read(predict_spatial_crossval) |> 
-  mutate(H_med=case_when(mod%in%c("nul","origin")~H_med2,
+  mutate(H_med=case_when(mod%in%c("nul_mod","origin")~H_med2,
                          TRUE~H_med),
-         H_q05=case_when(mod%in%c("nul","origin")~H_q052,
+         H_q05=case_when(mod%in%c("nul_mod","origin")~H_q052,
                          TRUE~H_q05),
-         H_q95=case_when(mod%in%c("nul","origin")~H_q952,
+         H_q95=case_when(mod%in%c("nul_mod","origin")~H_q952,
                          TRUE~H_q95)) |> 
   select(!c(H_med2,H_q052,H_q952))
 dataWD <- getWoodDensity(
@@ -158,46 +158,48 @@ predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
 Hpred_chave <- computeAGB(D = predict_spatial_crossval$dbh,
                                               WD = dataWD$meanWD,
                                               H = predict_spatial_crossval$H_med)
-rbind(predict_spatial_crossval) |> 
+rbind(predict_spatial_crossval,
+      predict_fit_systori) |> 
   mutate(dh=(H-H_med)/H,
-         sep_h=abs(H_med-H),
+         sep_h=H_med-H,
          dAGB=100*(AGBobs-AGBpred)/AGBobs,
-         mod=factor(mod,levels=c("nul","origin","system","systori","complete"))) |> 
-  filter(H>1) |> 
-  filter(!(H<2&dbh>7.5)) |>
-  filter(dh>(-10)) |> 
-  ggplot(aes(as.factor(fold),sep_h,fill=mod))+
+         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  group_by(system,id_plot,mod) |> 
+  summarise(AGBpred_plot=sum(AGBpred),
+            AGBobs_plot=sum(AGBobs),
+            dAGB_plot=(AGBobs_plot-AGBpred_plot)/AGBobs_plot) |> 
+  ggplot(aes(as.factor(mod),dAGB_plot,fill=as.factor(mod)))+
   geom_boxplot()+
   geom_hline(yintercept=0)+
   theme_light()+
-  facet_wrap(~system)+
-  ylim(c(-10,10))
+  facet_wrap(~system)
+  
+  # filter(H>1) |> 
+  # filter(!(H<2&dbh>7.5)) |>
+  # filter(dh>(-10)) |> 
+  ggplot(aes(as.factor(mod),sep_h,fill=as.factor(mod)))+
+  geom_boxplot()+
+  geom_hline(yintercept=0)+
+  theme_light()+
+  facet_wrap(~origin)
+  ylim(c(-20,20))
+  
+  load("mod_spatial_cross_valid/subdata_3_nul_mod.RData")
+  
+  load("mod_spatial_cross_valid/subdata_14_system.RData")
 ```
 
 # block map
 ```{r}
 civ_map=sf::read_sf(dsn="data/civ/",
                 layer="COTE D'IVE")
-# Determine eps and minPts
-# You might need to experiment with different values to get around 23 clusters.
-eps <- 0.3  # example value for eps
-minPts <- 10  # example value for minPts
-points_sf <- st_as_sf(mod.data.all, coords = c("long", "lat"), crs = 4326)
-# Apply DBSCAN
-dbscan_result <- dbscan(as.matrix(mod.data.all[,c("long","lat")]), eps = eps, minPts = minPts)
 
-# Add cluster results to the dataframe
-mod.data.all$cluster <- as.factor(dbscan_result$cluster)
-
-mod.data.ba.dbscan |> 
-  select(lat,long,id_plot,system,cluster) |> unique() |> #filter(cluster%in%c(1:10)) |> 
-  ggplot()+
-  geom_jitter(aes(x=long,y=lat,color=as.factor(cluster)),width=0.05,height =0.05)
-cbind(mod.data.all,
-      fold=scv$folds_ids) |>
-  select(lat,long,id_plot,system,fold) |> unique() |> filter(fold%in%c(16,17)) |> 
-  ggplot()+
-  geom_jitter(aes(x=long,y=lat,color=as.factor(fold)),width=0.05,height =0.05)
-
+predict_spatial_crossval |> 
+  select(systori,system,id_plot,lat,long,cluster) |>
+  distinct() |> 
+  ggplot(aes(lat,long,color=cluster))+
+  geom_point() +
+  facet_wrap(~system)
+  
 ```
 
