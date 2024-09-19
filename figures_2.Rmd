@@ -121,7 +121,7 @@ cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
 # Biomass predictions
 
 ```{r}
-predict_fit_systori<-tar_read(subdata_fit_systori)$data_pred |> 
+predict_fit_systori<-tar_read(subdata_fit_systori)$data_pred |>
   select(!c(cof,num,corr)) |> mutate(mod="systori_sub",cluster=as.factor(0))
 dataWD <- getWoodDensity(
   genus = predict_fit_systori$genusCorr,
@@ -137,14 +137,7 @@ predict_fit_systori$AGBpred<- computeAGB(D = predict_fit_systori$dbh,
                                               # WD = dataWD$meanWD,
                                               # H = predict_fit_systori$H_med)
 
-predict_spatial_crossval<-tar_read(predict_spatial_crossval) |> 
-  mutate(H_med=case_when(mod%in%c("nul_mod","origin")~H_med2,
-                         TRUE~H_med),
-         H_q05=case_when(mod%in%c("nul_mod","origin")~H_q052,
-                         TRUE~H_q05),
-         H_q95=case_when(mod%in%c("nul_mod","origin")~H_q952,
-                         TRUE~H_q95)) |> 
-  select(!c(H_med2,H_q052,H_q952))
+tar_load(predict_spatial_crossval)
 dataWD <- getWoodDensity(
   genus = predict_spatial_crossval$genusCorr,
   species = predict_spatial_crossval$speciesCorr,
@@ -158,21 +151,43 @@ predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
 Hpred_chave <- computeAGB(D = predict_spatial_crossval$dbh,
                                               WD = dataWD$meanWD,
                                               H = predict_spatial_crossval$H_med)
-rbind(predict_spatial_crossval,
-      predict_fit_systori) |> 
-  mutate(dh=(H-H_med)/H,
-         sep_h=H_med-H,
-         dAGB=100*(AGBobs-AGBpred)/AGBobs,
+# rbind(predict_spatial_crossval,
+#       predict_fit_systori) |> 
+predict_spatial_crossval |> 
+  mutate(dh=(H_med-H)/H,
+         sep_h=H-H_med,
+         dAGB=100*(AGBpred-H_med)/AGBobs,
          mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  filter(mod!="complete") |> 
   group_by(system,id_plot,mod) |> 
   summarise(AGBpred_plot=sum(AGBpred),
             AGBobs_plot=sum(AGBobs),
-            dAGB_plot=(AGBobs_plot-AGBpred_plot)/AGBobs_plot) |> 
+            dAGB_plot=100*(AGBpred_plot-AGBobs_plot)/AGBobs_plot) |> 
   ggplot(aes(as.factor(mod),dAGB_plot,fill=as.factor(mod)))+
   geom_boxplot()+
   geom_hline(yintercept=0)+
   theme_light()+
-  facet_wrap(~system)
+  theme(legend.position="none")+
+  facet_wrap(~system)+
+  labs(x="Model",
+       y="Error in predicted biomass per plot (%)")
+
+predict_spatial_crossval |> 
+mutate(dh=100*(H_med-H)/H,
+         sep_h=H-H_med,
+         dAGB=100*(AGBpred-AGBobs)/AGBobs,
+         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  filter(mod!="complete") |> 
+  ggplot(aes(as.factor(mod),dAGB,fill=as.factor(mod)))+
+  geom_boxplot()+
+  geom_hline(yintercept=0)+
+  theme_light()+
+  theme(legend.position="none")+
+  facet_wrap(~system)+
+  labs(x="Model",
+       y="Error in predicted biomass (%)")+
+    ylim(c(-100,200))
+
   
   # filter(H>1) |> 
   # filter(!(H<2&dbh>7.5)) |>
