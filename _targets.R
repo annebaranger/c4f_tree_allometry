@@ -22,23 +22,34 @@ source("R/function_fit.R")
 # source("other_functions.R") # Source other scripts as needed. # nolint
 
 list(
-  ## Data formating
+  #### Data formatting ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%
+  
+  #' Get data OIBT
   tar_target(
-    data_oibt,
+    data_oibt, 
     oibt(dir.data="data/oibt")
   ),
+  
+  #' Get data Tene
   tar_target(
     data_tene,
     tene(dir.data="data/tene")
   ),
+  
+  #' Get data Amani
   tar_target(
     data_bhkamani,
     bhkamani(dir.data="data/bhkamani")
   ),
+  
+  #' Get data Anny
   tar_target(
     data_nguessan,
     nguessan(dir.data="data/nguessan")
   ),
+  
+  #' Get data plantation
   tar_target(
     data_lataha,
     lataha(dir.data="data/lataha")
@@ -47,14 +58,20 @@ list(
     data_mopri.sangoue,
     mopri.sangoue(dir.data="data/mopri_sangoue")
   ),
+  
+  #' Get data Elsa Sanial
   tar_target(
     data_esanial,
     esanial(dir.data="data/esanial/")
   ),
+  
+  #' Get data Aime Kouassi
   tar_target(
     data_akouassi,
     akouassi(dir.data="data/akouassi/")
   ),
+  
+  #' Gather all trees
   tar_target(
     tree,
     get.tree(data_bhkamani,
@@ -67,6 +84,8 @@ list(
              data_akouassi,
              output.file="all_tree_corr.csv")
   ),
+  
+  #' Gather all plot
   tar_target(
     plot,
     get.env(data_bhkamani,
@@ -80,7 +99,10 @@ list(
             output.file="all_plot_corr.csv")
   ),
   
-  # Fit models
+  #### Format data for model fit ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  
+  #' All data including plots without BA
   tar_target(
     mod.data.all,
     data.fit(tree,
@@ -88,12 +110,16 @@ list(
              frac=1,
              ba_require=FALSE)
   ),
+  
+  #' All data excluding plots with missing BA
   tar_target(
     mod.data,
     data.fit(tree,
              plot,
              frac=1)
   ),
+  
+  #' subdataset with 10% of data, and plot without BA
   tar_target(
     sub.mod.data.1,
     data.fit(tree,
@@ -101,6 +127,8 @@ list(
              frac=0.1,
              ba_require=FALSE)
   ),
+  
+  #' subdataset with 30% of data, and plot without BA
   tar_target(
     sub.mod.data.3,
     data.fit(tree,
@@ -108,6 +136,8 @@ list(
              frac=0.3,
              ba_require=FALSE)
   ),
+  
+  #' subdataset with 30% of data, and only plot with BA
   tar_target(
     sub.mod.data.3.ba,
     data.fit(tree,
@@ -115,21 +145,32 @@ list(
              frac=0.3,
              ba_require=TRUE)
   ),
+  
+  #### Models "pre-fit" for variable selection ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  
+  #' shape selection
   tar_target(
     shape.selection,
     shape.select(folder="mod_shape_select",
                  sub.mod.data.1)
   ),
+  
+  #' cofactor selection
   tar_target(
     cofactor.selection,
     cofactor.select(folder="mod_cof_select",
                     sub.mod.data.3)
   ),
+  
+  #' covariable selection
   tar_target(
     covariable.models,
     covariable.select(sub.mod.data.3.ba,
                       folder="mod_cov_select")
   ),
+  
+  #' selection of cofactor with loo
   tar_target(
     comp.cofactor,
     select.mod(files.list=c("mod_cov_select/mod_nul.rdata",
@@ -138,6 +179,8 @@ list(
                             "mod_cov_select/nul_systori.rdata"),
                list.names=c("nul","ori","sys","systori"))
   ),
+  
+  #' selection of covariables with loo
   tar_target(
     comp.covar,
     select.mod(files.list=c("mod_cov_select/so_bio01.rdata",
@@ -149,6 +192,8 @@ list(
                             "mod_cov_select/complete.rdata"),
                list.names=c("mat","mtwm","map","mpdq","vcomp","ba","complete"))
   ),
+  
+  #' fit selected best model on subdata
   tar_target(
     subdata_fit_systori,
     get_subdata_fit(data=sub.mod.data.3.ba,
@@ -157,6 +202,10 @@ list(
                     model_function="model_systori",
                     correspondance_table)
   ),
+  
+  
+  #### Spatial cross-validation ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   # tar_target(
   #   list.subdataset,
   #   make_subdataset(mod.data,
@@ -167,6 +216,8 @@ list(
   #   make_blockCV(mod.data,
   #                nfold=4)
   # ),
+  
+  #' design clusters with dbscan
   tar_target(
     mod.data.dbscan,
     make_dbscan(mod.data.all)
@@ -175,6 +226,8 @@ list(
     mod.data.ba.dbscan,
     make_dbscan(mod.data)
   ),
+  
+  #' get simulation plan
   tar_target(
     sim.plan,
     make_sim_plan(mod.data.dbscan,
@@ -184,6 +237,8 @@ list(
     id.sim,
     1:dim(sim.plan)[1]
   ),
+  
+  #' fit models while excluding iteratively each cluster (parallelized)
   tar_target(
     spatial.cross.val,
     make_model(sim.plan,
@@ -195,6 +250,8 @@ list(
     iteration="vector",
     format="file"
   ),
+  
+  #' build a correspondance table between all cofactor names
   tar_target(
     correspondance_table,
     mod.data |> 
@@ -210,6 +267,9 @@ list(
       select(cof,num,corr,system,origin) |> 
       unique()
   ),
+  
+  #' make predictions of models fitted in the spatial cross-val
+  #' for each cluster, predictions are made with the model where it was not included in the fit
   tar_target(
     predict_spatial_crossval,
     get_prediction(spatial.cross.val,
@@ -220,6 +280,8 @@ list(
     pattern=map(id.sim),
     iteration="vector"
   ),
+  
+  #' build a global fit of the model by gathering each spatial cross-val fits
   tar_target(
     global_fit_systori,
     get_global_fit(sim.plan,
