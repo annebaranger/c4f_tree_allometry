@@ -3,11 +3,12 @@ library(targets)
 
 # Set target options:
 tar_option_set(
-  packages = c("dplyr","tidyr","stringr","readxl","BIOMASS",
+  packages = c("dplyr","tidyr","stringr",#"readxl","BIOMASS",
                "sf","terra",
-               "rstan","loo","blockCV",#"dbscan",
+               "rstan","loo","blockCV","dbscan",
                "future"), # packages that your targets need to run
   format = "rds", # default storage format
+  error="continue",
   memory="transient"
 )
 

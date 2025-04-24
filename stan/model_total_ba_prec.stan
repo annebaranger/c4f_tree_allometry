@@ -14,12 +14,8 @@ data {
 
 
 parameters {
-  real <lower=20,upper=100> alpha_0;
-  vector <lower=20,upper=100> [so] alpha;
-  real <lower=0> sigma_a;
-  real <lower=0,upper=100> beta_0;
+  vector <lower=0,upper=100> [so] alpha;
   vector <lower=0,upper=100> [so] beta;
-  real <lower=0> sigma_b;
   real <lower=-3,upper=3> beta_ba;
   real <lower=-3,upper=3> beta_precmin;
   // plot random effect
@@ -39,8 +35,8 @@ model {
     mu[i] = gamma_sp[species[i]]*gamma_plot[plot[i]]*(alpha[systori[i]] * dbh[i])/ 
             (beta_i[i]+dbh[i]);
   }
-  alpha~lognormal(log(alpha_0),sigma_a);
-  beta~lognormal(log(beta_0),sigma_b);
+  alpha~normal(40,10);
+  beta~normal(40,10);
   gamma_sp~lognormal(0,sigma_sp);
   gamma_plot ~ lognormal(0, sigma_plot);
   // Likelihood part of Bayesian inference
