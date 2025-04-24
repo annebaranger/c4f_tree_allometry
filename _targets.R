@@ -59,6 +59,7 @@ list(
     mopri.sangoue(dir.data="data/mopri_sangoue")
   ),
   
+  
   #' Get data Elsa Sanial
   tar_target(
     data_esanial,
