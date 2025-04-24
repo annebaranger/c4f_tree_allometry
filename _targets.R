@@ -3,7 +3,7 @@ library(targets)
 
 # Set target options:
 tar_option_set(
-  packages = c("dplyr","tidyr","stringr",#"readxl","BIOMASS",
+  packages = c("dplyr","tidyr","stringr","readxl","BIOMASS",
                "sf","terra",
                "rstan","loo","blockCV",#"dbscan",
                "future"), # packages that your targets need to run
@@ -59,7 +59,7 @@ list(
     mopri.sangoue(dir.data="data/mopri_sangoue")
   ),
   
-  
+
   #' Get data Elsa Sanial
   tar_target(
     data_esanial,

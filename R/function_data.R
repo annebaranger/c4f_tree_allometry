@@ -259,6 +259,9 @@ bhkamani<-function(dir.data="data/bhkamani"){
            system=as.factor(if_else(categorie=="foretanc",
                                     "forest",
                                     "secondary_forest")),
+           system=case_when(system=="secondary_forest"&age<=20~"young_sf",
+                            system=="secondary_forest"&age>20~"old_sf",
+                            TRUE~system),
            lat=as.numeric(lat),
            long=as.numeric(long),
            id_plot=as.factor(id_plot)) |> 
@@ -302,7 +305,7 @@ bhkamani<-function(dir.data="data/bhkamani"){
     mutate(## put secondary_forest where data is missing
       system=as.character(system),
       system=as.factor(if_else(is.na(system)==TRUE,
-                               "secondary_forest",
+                               "young_sf",
                                system)),
       ## set origin
       origin=if_else(system=="forest",
@@ -377,6 +380,9 @@ nguessan<-function(dir.data="data/nguessan"){
            system=as.factor(if_else(categorie%in%c("foretanci ","foretexpl "),
                                     "forest",
                                     "secondary_forest")),
+           system=case_when(system=="secondary_forest"&age<=20~"young_sf",
+                            system=="secondary_forest"&age>20~"old_sf",
+                            TRUE~system),
            area_plot.ha=0.2) |> 
     ## Tidy
     relocate(X,Y,alt,.before="age") |> 
