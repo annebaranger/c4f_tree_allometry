@@ -153,14 +153,14 @@ list(
   #' shape selection
   tar_target(
     shape.selection,
-    shape.select(folder="mod_shape_select",
+    shape.select(folder="mod_shape_select_branch1",
                  sub.mod.data.1)
   ),
   
   #' cofactor selection
   tar_target(
     cofactor.selection,
-    cofactor.select(folder="mod_cof_select",
+    cofactor.select(folder="mod_cof_select_branch1",
                     sub.mod.data.3)
   ),
   
@@ -168,29 +168,29 @@ list(
   tar_target(
     covariable.models,
     covariable.select(sub.mod.data.3.ba,
-                      folder="mod_cov_select")
+                      folder="mod_cov_select_branch1")
   ),
   
   #' selection of cofactor with loo
   tar_target(
     comp.cofactor,
-    select.mod(files.list=c("mod_cov_select/mod_nul.rdata",
-                            "mod_cov_select/nul_ori.rdata",
-                            "mod_cov_select/nul_sys.rdata",
-                            "mod_cov_select/nul_systori.rdata"),
+    select.mod(files.list=c("mod_cov_select_branch1/mod_nul.rdata",
+                            "mod_cov_select_branch1/nul_ori.rdata",
+                            "mod_cov_select_branch1/nul_sys.rdata",
+                            "mod_cov_select_branch1/nul_systori.rdata"),
                list.names=c("nul","ori","sys","systori"))
   ),
   
   #' selection of covariables with loo
   tar_target(
     comp.covar,
-    select.mod(files.list=c("mod_cov_select/so_bio01.rdata",
-                            "mod_cov_select/so_bio05.rdata",
-                            "mod_cov_select/so_bio12.rdata",
-                            "mod_cov_select/so_bio17.rdata",
-                            "mod_cov_select/so_v_compet.rdata",
-                            "mod_cov_select/so_ba_tot.rdata",
-                            "mod_cov_select/complete.rdata"),
+    select.mod(files.list=c("mod_cov_select_branch1/so_bio01.rdata",
+                            "mod_cov_select_branch1/so_bio05.rdata",
+                            "mod_cov_select_branch1/so_bio12.rdata",
+                            "mod_cov_select_branch1/so_bio17.rdata",
+                            "mod_cov_select_branch1/so_v_compet.rdata",
+                            "mod_cov_select_branch1/so_ba_tot.rdata",
+                            "mod_cov_select_branch1/complete.rdata"),
                list.names=c("mat","mtwm","map","mpdq","vcomp","ba","complete"))
   ),
   
@@ -198,7 +198,7 @@ list(
   tar_target(
     subdata_fit_systori,
     get_subdata_fit(data=sub.mod.data.3.ba,
-                    model_file="mod_cov_select/nul_systori.rdata",
+                    model_file="mod_cov_select_branch1/nul_systori.rdata",
                     model_type="systori",
                     model_function="model_systori",
                     correspondance_table)

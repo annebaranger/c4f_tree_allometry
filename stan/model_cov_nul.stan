@@ -12,12 +12,8 @@ data {
 
 
 parameters {
-  real <lower=20,upper=60> alpha_0;
-  vector <lower=20,upper=60> [ncof] alpha;
-  real <lower=0> sigma_a;
-  real <lower=0,upper=80> beta_0;
-  vector <lower=0,upper=80> [ncof] beta;
-  real <lower=0> sigma_b;
+  vector <lower=0,upper=100> [ncof] alpha;
+  vector <lower=0,upper=100> [ncof] beta;
   vector <lower=0> [p] gamma_plot;
   real<lower=0> sigma_plot;
   vector <lower=0> [sp] gamma_sp;
@@ -31,8 +27,8 @@ model {
     mu[i] = gamma_sp[species[i]]*gamma_plot[plot[i]]*(alpha[cof[i]] * dbh[i])/ 
             (beta[cof[i]]+dbh[i]);
   }
-  alpha~lognormal(log(alpha_0),sigma_a);
-  beta~lognormal(log(beta_0),sigma_b);
+  alpha~normal(40,10);
+  beta~normal(40,10);
   gamma_sp~lognormal(0,sigma_sp);
   gamma_plot ~ lognormal(0, sigma_plot);
   H~lognormal(log(mu),sigma);

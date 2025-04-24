@@ -81,6 +81,7 @@ model_complete <- function(x,ba,precmin,
 
 data.fit<-function(tree,
                    plot,
+                   levels_sys=c("forest","old_sf","young_sf","plantation","agroforestry"),
                    frac=1,
                    ba_require=TRUE){
   if(ba_require){
@@ -91,6 +92,7 @@ data.fit<-function(tree,
     tree<-tree |> 
       sample_frac(size=frac)
   }
+  
   data_tree=tree %>%
     left_join(plot) %>%
     filter(!(H==1&dbh>5)) %>% # filter weird tree
@@ -100,11 +102,8 @@ data.fit<-function(tree,
     filter(is.na(bio01)==FALSE) %>%
     filter(!is.na(origin)) |> 
     filter(!is.na(system)) |> 
-    mutate(system=ordered(system,levels=c("forest","secondary_forest","plantation","agroforestry")),
-           sys=case_when(system=="forest"~1,
-                         system=="secondary_forest"~2,
-                         system=="plantation"~3,
-                         system=="agroforestry"~4),
+    mutate(system=ordered(system,levels=levels_sys),
+           sys=as.numeric(system),
            ori=as.numeric(case_when(origin=="remnant"~1,
                                     origin=="recruited"~2,
                                     origin=="planted"~3)),
