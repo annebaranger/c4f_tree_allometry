@@ -1,78 +1,214 @@
 ---
-title: "figures"
+title: "Figures"
 author: "Anne Baranger"
 date: "2024-07-05"
-output: html_document
+output:
+  bookdown::html_document2:
+    toc: true            # Table des matières (menu)
+    toc_float: true       # Menu flottant sur le côté
+    number_sections: true # Numérotation automatique des sections
+    code_folding: hide    # Cacher le code par défaut (cliquable pour afficher)
+    df_print: paged       # Jolie impression des dataframes
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-lapply(c("targets","stringr","tidyr","dplyr","tibble", # data analysis
-         "ggplot2","viridis","ggridges", # plot
-         "rstan","shinystan","BIOMASS",# stat & models
-         "rworldmap" # geographic data #terre, sf
-         ),require,character.only=TRUE)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+
+lapply(c("targets", "stringr", "tidyr", "dplyr", "tibble", # data analysis
+         "ggplot2", "viridis", "ggridges",                # plot
+         "rstan", "shinystan", "BIOMASS",                 # stat & models
+         "rworldmap"                                      # geographic data
+         ), require, character.only = TRUE)
 ```
 
 # Trajectories with systori model
 
-## With global fits concatenation
-```{r}
+## With global fits concatenation - by origin type
+
+```{r,fig.height=9,fig.width=7}
 traj<-tar_read(global_fit_systori)$trajectory
 fit<-tar_read(global_fit_systori)$fit_df
 tar_load(mod.data)
 tar_load(correspondance_table)
-trajectories<-ggplot(data=traj)+
-  geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.1)+
+trajectories<-traj %>% 
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry"))) %>% 
+  ggplot()+
+  geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.1,guide='none')+
   geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=system),fill="grey",alpha=0.5)+
   geom_line(aes(dbh,H_med,group=system,color=system))+
   facet_wrap(~origin)+
-  scale_color_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
-                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  scale_color_manual(labels=c("Forest","Old sec. for.","Young sec. for.","Plantation","Agroforestry"),
+                     values=c("darkgreen","mediumseagreen","mediumspringgreen","steelblue3","lightsalmon"))+
   scale_y_log10()+
+  theme_light()+
   theme(legend.position = "top")+
   labs(color="System")
+
 alpha<-fit |> 
   select(matches("alpha")&!matches("_0")) |> 
   pivot_longer(cols=everything()) |> 
   mutate(name=str_replace(name,"alpha_",""))|>
   left_join(correspondance_table,by=c("name"="corr")) |> 
-  mutate(system=ordered(system,
-                        levels=c("forest","secondary_forest","plantation","agroforestry"))) |> 
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry"))) %>% 
   ggplot(aes(value,system,fill=system))+
   geom_density_ridges(scale=0.8)+
-  scale_fill_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
-                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  scale_fill_manual(labels=c("Forest","Old sec. for.","Young sec. for.","Plantation","Agroforestry"),
+                     values=c("darkgreen","mediumseagreen","mediumspringgreen","steelblue3","lightsalmon"))+
   facet_wrap(~origin)+
+  theme_light()+
   theme(axis.text.y = element_text(color="white",angle=90),
-        axis.ticks.y = element_line(color="white"))+
-  theme(legend.position = "none")+
+        axis.ticks.y = element_line(color="white"),
+        legend.position = "none")+
   labs(y="",x="Alpha value")
+
 beta<-fit |> 
   select(matches("beta")&!matches("_0")) |> 
   pivot_longer(cols=everything()) |> 
   mutate(name=str_replace(name,"beta_","")) |> 
   left_join(correspondance_table,by=c("name"="corr")) |> 
-  mutate(system=ordered(system,
-                        levels=c("forest","secondary_forest","plantation","agroforestry"))) |>
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry"))) %>% 
   ggplot(aes(value,system,fill=system))+
   geom_density_ridges(scale=0.8)+
-  scale_fill_manual(labels=c("Forest","Secondary forest","Plantation","Agroforestry"),
-                     values=c("forestgreen","lightgreen","steelblue3","lightsalmon"))+
+  scale_fill_manual(labels=c("Forest","Old sec. for.","Young sec. for.","Plantation","Agroforestry"),
+                     values=c("darkgreen","mediumseagreen","mediumspringgreen","steelblue3","lightsalmon"))+
   facet_wrap(~origin)+
+  theme_light()+
   theme(axis.text.y = element_text(color="white",angle=90),
-        axis.ticks.y = element_line(color="white"))+
-  theme(legend.position = "none")+
+        axis.ticks.y = element_line(color="white"),
+        legend.position = "none")+
   labs(y="",x="Beta value")
 cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
 ```
-## With fit from subdataset
+
+## With global fits concatenation - by system type
+
+```{r,fig.height=9,fig.width=8}
+traj<-tar_read(global_fit_systori)$trajectory
+fit<-tar_read(global_fit_systori)$fit_df
+tar_load(mod.data)
+tar_load(correspondance_table)
+trajectories<-traj %>% 
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry")),
+         origin=factor(origin,levels=c("planted","recruited","remnant"))) %>% 
+  ggplot()+
+  geom_point(data=mod.data,aes(dbh,H,color=origin),alpha=0.1,guide='none')+
+  geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=origin),fill="grey",alpha=0.5)+
+  geom_line(aes(dbh,H_med,group=origin,color=origin))+
+  facet_wrap(~system,nrow=1)+
+  scale_color_manual(labels=c("Planted","Recruited","Remnant"),
+                     values=c("darkred","steelblue2","forestgreen"))+
+  scale_y_log10()+
+  theme_light()+
+  theme(legend.position = "top")+
+  labs(color="Origin")
+
+alpha<-fit |> 
+  select(matches("alpha")&!matches("_0")) |> 
+  pivot_longer(cols=everything()) |> 
+  mutate(name=str_replace(name,"alpha_",""))|>
+  left_join(correspondance_table,by=c("name"="corr")) |> 
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry")),
+         origin=factor(origin,levels=c("planted","recruited","remnant"))) %>% 
+  ggplot(aes(value,origin,fill=origin))+
+  geom_density_ridges(scale=0.8)+
+  scale_fill_manual(labels=c("Planted","Recruited","Remnant"),
+                     values=c("darkred","steelblue2","forestgreen"))+
+  facet_wrap(~system,nrow = 1)+
+  theme_light()+
+  theme(axis.text.y = element_text(color="white",angle=90),
+        axis.ticks.y = element_line(color="white"),
+        legend.position = "none")+
+  labs(y="",x="Alpha value")
+
+beta<-fit |> 
+  select(matches("beta")&!matches("_0")) |> 
+  pivot_longer(cols=everything()) |> 
+  mutate(name=str_replace(name,"beta_","")) |> 
+  left_join(correspondance_table,by=c("name"="corr")) |> 
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry")),
+         origin=factor(origin,levels=c("planted","recruited","remnant"))) %>% 
+  ggplot(aes(value,origin,fill=origin))+
+  geom_density_ridges(scale=0.8)+
+  scale_fill_manual(labels=c("Planted","Recruited","Remnant"),
+                     values=c("darkred","steelblue2","forestgreen"))+
+  facet_wrap(~system,nrow=1)+
+  theme_light()+
+  theme(axis.text.y = element_text(color="white",angle=90),
+        axis.ticks.y = element_line(color="white"),
+        legend.position = "none")+
+  labs(y="",x="Beta value")
+cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
+```
+
+# Parameters of the "systori" model
 
 ```{r}
+fit<-tar_read(global_fit_systori)$fit_df
+
+corr_tab=correspondance_table %>% 
+  mutate(system=case_when(system=="young_sf"~"Young sec. for.",
+                          system=="old_sf"~"Old sec. for.",
+                          TRUE~str_to_title(system)))
+fit %>% 
+  select(matches(c("alpha","beta"))) %>% 
+  pivot_longer(everything()) %>%
+  group_by(name) %>%
+  summarise(
+    q05 = quantile(value, 0.05, na.rm = TRUE),
+    q25 = quantile(value, 0.25, na.rm = TRUE),
+    q50 = quantile(value, 0.50, na.rm = TRUE),
+    q75 = quantile(value, 0.75, na.rm = TRUE),
+    q95 = quantile(value, 0.95, na.rm = TRUE)
+  ) %>% 
+  separate(name,c("parameter", "system", "origin"), convert = TRUE) %>% 
+  mutate(corr=paste(system,origin,sep="_")) %>% 
+  select(-origin,-system) %>% 
+  left_join(corr_tab[,c(3:5)],by="corr") %>% 
+  pivot_wider(names_from = parameter,
+              values_from = c("q05","q25","q50","q75","q95"), 
+              names_glue = "{parameter}_{.value}") %>% 
+  ggplot(aes(x=beta_q50, y=alpha_q50,
+             col = paste0(system, "\n", origin),
+             label = paste0(system, "\n", origin))) +
+  geom_segment(aes(x = beta_q25, xend = beta_q75, yend=alpha_q50))+ 
+  geom_segment(aes(x = beta_q05, xend = beta_q95, yend=alpha_q50), size = .2) +
+  geom_segment(aes(y = alpha_q25, yend = alpha_q75,xend=beta_q50)) +
+  geom_segment(aes(y = alpha_q50, yend = alpha_q95,xend=beta_q50), size = .2) +
+  geom_point()+
+  ggrepel::geom_text_repel(box.padding = 0.4, ) +
+  theme_bw() +
+  scale_color_discrete(guide = "none") +
+  ylab("Asymptotic height [ m ]") +
+  xlab("Diameter at 50% height [ cm ]")
+```
+
+
+```{r eval=FALSE, include=FALSE}
+fit %>% 
+  select(matches(c("alpha","beta"))) %>% 
+  pivot_longer(everything()) %>%
+  separate(name,c("parameter", "system", "origin"), convert = TRUE) %>% 
+  mutate(corr=paste(system,origin,sep="_")) %>% 
+  select(-origin,-system) %>% 
+  left_join(corr_tab[,c(3:5)],by="corr") %>% 
+  ggplot(aes(value,fill=origin))+
+  geom_density(alpha=0.5,color=NA)+
+  facet_wrap(system~parameter,scales="free")
+```
+
+
+<!-- ## With fit from subdataset -->
+
+```{r eval=FALSE, include=FALSE}
 traj_sub<-tar_read(subdata_fit_systori)$trajectory
 fit_sub<-tar_read(subdata_fit_systori)$fit_df
 tar_load(mod.data)
 tar_load(correspondance_table)
+
 trajectories<-ggplot(data=traj_sub)+
   geom_point(data=mod.data,aes(dbh,H,color=system),alpha=0.1)+
   geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=system),fill="grey",alpha=0.5)+
@@ -121,6 +257,112 @@ cowplot::plot_grid(trajectories,alpha,beta,nrow=3,rel_heights = c(1,0.6,0.6))
 # Biomass predictions
 
 ```{r}
+tar_load(predict_spatial_crossval)
+dataWD <- getWoodDensity(
+  genus = predict_spatial_crossval$genusCorr,
+  species = predict_spatial_crossval$speciesCorr,
+  stand = predict_spatial_crossval$id_plot)
+predict_spatial_crossval$AGBobs<- computeAGB(D = predict_spatial_crossval$dbh,
+                                             WD = dataWD$meanWD,
+                                             H = predict_spatial_crossval$H)
+predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
+                                              WD = dataWD$meanWD,
+                                              H = predict_spatial_crossval$H_med)
+Hpred_chave <- computeAGB(D = predict_spatial_crossval$dbh,
+                                              WD = dataWD$meanWD,
+                                              H = predict_spatial_crossval$H_med)
+# rbind(predict_spatial_crossval,
+#       predict_fit_systori) |>
+```
+
+
+
+## Comparison of height prediction between null model and systori model
+
+```{r,fig.height=7,fig.width=10}
+predict_spatial_crossval |> 
+  mutate(dh=100*(H_med-H)/H,
+         sep_h=H-H_med,
+         dAGB=100*(AGBpred-AGBobs)/AGBobs,
+         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  filter(mod%in%c("nul_mod","systori")) |> 
+  ggplot(aes(sep_h,fill=as.factor(mod)))+
+  geom_density(alpha=0.5,col=NA)+
+  geom_vline(xintercept=0,color="black")+
+  theme_light()+
+  theme(legend.position = "bottom")+
+  facet_wrap(~system,scales="free")+
+  labs(fill="Model",
+       y="Density",
+       x="Error in predicted height (meter)")
+```
+
+```{r,eval=FALSE, include=FALSE,fig.height=5,fig.width=10}
+predict_spatial_crossval |> 
+  mutate(dh=100*(H_med-H)/H,
+         sep_h=H-H_med,
+         dAGB=100*(AGBpred-AGBobs)/AGBobs,
+         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  filter(mod%in%c("nul_mod","systori")) |> 
+  ggplot(aes(sep_h,fill=as.factor(mod)))+
+  geom_density(alpha=0.5,col=NA)+
+  geom_vline(xintercept=0,color="black")+
+  theme_light()+
+  theme(legend.position = "bottom")+
+  facet_wrap(~origin,scales="free")+
+  labs(fill="Model",
+       y="Density",
+       x="Error in predicted height (meter)")
+```
+
+## Comparison of biomass prediction error, by tree and between four models
+```{r,fig.height=5,fig.width=7}
+predict_spatial_crossval |> 
+mutate(dh=100*(H_med-H)/H,
+         sep_h=H-H_med,
+         dAGB=100*(AGBpred-AGBobs)/AGBobs,
+         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  filter(mod!="complete") |> 
+  ggplot(aes(dAGB,as.factor(mod),fill=as.factor(mod)))+
+  geom_boxplot()+
+  geom_vline(xintercept=0)+
+  theme_light()+
+  theme(legend.position="none")+
+  facet_wrap(~system)+
+  labs(y="Model",
+       x="Error in predicted biomass (%)")+
+    xlim(c(-100,200))
+```
+
+
+
+
+##  Comparison of biomass prediction error, by plot and between four models
+
+```{r,fig.height=5,fig.width=7}
+predict_spatial_crossval |> 
+  mutate(dh=(H_med-H)/H,
+         sep_h=H-H_med,
+         dAGB=100*(AGBpred-H_med)/AGBobs,
+         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
+  filter(mod!="complete") |> 
+  group_by(system,id_plot,mod) |> 
+  summarise(AGBpred_plot=sum(AGBpred),
+            AGBobs_plot=sum(AGBobs),
+            dAGB_plot=100*(AGBpred_plot-AGBobs_plot)/AGBobs_plot) |> 
+  ggplot(aes(dAGB_plot,as.factor(mod),fill=as.factor(mod)))+
+  geom_boxplot()+
+  geom_vline(xintercept=0)+
+  theme_light()+
+  theme(legend.position="none")+
+  facet_wrap(~system)+
+  labs(y="Model",
+       x="Error in predicted biomass per plot (%)")
+```
+
+<!-- ## from subdata -->
+
+```{r eval=FALSE, include=FALSE}
 predict_fit_systori<-tar_read(subdata_fit_systori)$data_pred |>
   select(!c(cof,num,corr)) |> mutate(mod="systori_sub",cluster=as.factor(0))
 dataWD <- getWoodDensity(
@@ -137,84 +379,20 @@ predict_fit_systori$AGBpred<- computeAGB(D = predict_fit_systori$dbh,
                                               # WD = dataWD$meanWD,
                                               # H = predict_fit_systori$H_med)
 
-tar_load(predict_spatial_crossval)
-dataWD <- getWoodDensity(
-  genus = predict_spatial_crossval$genusCorr,
-  species = predict_spatial_crossval$speciesCorr,
-  stand = predict_spatial_crossval$id_plot)
-predict_spatial_crossval$AGBobs<- computeAGB(D = predict_spatial_crossval$dbh,
-                                             WD = dataWD$meanWD,
-                                             H = predict_spatial_crossval$H)
-predict_spatial_crossval$AGBpred<- computeAGB(D = predict_spatial_crossval$dbh,
-                                              WD = dataWD$meanWD,
-                                              H = predict_spatial_crossval$H_med)
-Hpred_chave <- computeAGB(D = predict_spatial_crossval$dbh,
-                                              WD = dataWD$meanWD,
-                                              H = predict_spatial_crossval$H_med)
-# rbind(predict_spatial_crossval,
-#       predict_fit_systori) |> 
-predict_spatial_crossval |> 
-  mutate(dh=(H_med-H)/H,
-         sep_h=H-H_med,
-         dAGB=100*(AGBpred-H_med)/AGBobs,
-         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
-  filter(mod!="complete") |> 
-  group_by(system,id_plot,mod) |> 
-  summarise(AGBpred_plot=sum(AGBpred),
-            AGBobs_plot=sum(AGBobs),
-            dAGB_plot=100*(AGBpred_plot-AGBobs_plot)/AGBobs_plot) |> 
-  ggplot(aes(as.factor(mod),dAGB_plot,fill=as.factor(mod)))+
-  geom_boxplot()+
-  geom_hline(yintercept=0)+
-  theme_light()+
-  theme(legend.position="none")+
-  facet_wrap(~system)+
-  labs(x="Model",
-       y="Error in predicted biomass per plot (%)")
-
-predict_spatial_crossval |> 
-mutate(dh=100*(H_med-H)/H,
-         sep_h=H-H_med,
-         dAGB=100*(AGBpred-AGBobs)/AGBobs,
-         mod=factor(mod,levels=c("nul_mod","origin","system","systori_sub","systori","complete"))) |> 
-  filter(mod!="complete") |> 
-  ggplot(aes(as.factor(mod),dAGB,fill=as.factor(mod)))+
-  geom_boxplot()+
-  geom_hline(yintercept=0)+
-  theme_light()+
-  theme(legend.position="none")+
-  facet_wrap(~system)+
-  labs(x="Model",
-       y="Error in predicted biomass (%)")+
-    ylim(c(-100,200))
-
-  
-  # filter(H>1) |> 
-  # filter(!(H<2&dbh>7.5)) |>
-  # filter(dh>(-10)) |> 
-  ggplot(aes(as.factor(mod),sep_h,fill=as.factor(mod)))+
-  geom_boxplot()+
-  geom_hline(yintercept=0)+
-  theme_light()+
-  facet_wrap(~origin)
-  ylim(c(-20,20))
-  
-  load("mod_spatial_cross_valid/subdata_3_nul_mod.RData")
-  
-  load("mod_spatial_cross_valid/subdata_14_system.RData")
 ```
 
-# block map
-```{r}
+
+<!-- # block map -->
+```{r eval=FALSE, include=FALSE}
 civ_map=sf::read_sf(dsn="data/civ/",
                 layer="COTE D'IVE")
 
-predict_spatial_crossval |> 
+predict_spatial_crossval |>
   select(systori,system,id_plot,lat,long,cluster) |>
-  distinct() |> 
+  distinct() |>
   ggplot(aes(lat,long,color=cluster))+
   geom_point() +
   facet_wrap(~system)
-  
+
 ```
 
