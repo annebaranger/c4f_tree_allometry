@@ -164,6 +164,13 @@ list(
                 target_n=50)
   ),
   
+  tar_target(
+    data.strat.10,
+    sample_data(mod.data,
+                groups=c("system","origin"),
+                target_n=10)
+  ),
+  
   #' weigthed data
   tar_target(
     sub.mod.data.3.ba.w,
@@ -259,6 +266,23 @@ list(
     fit.systori.strat50,
     get_subdata_fit(data=data.strat.50,
                     model_file=model.systori.strat50,
+                    model_type="systori",
+                    model_function="model_systori",
+                    correspondance_table)
+  ),
+  
+  tar_target(
+    model.systori.strat10,
+    fit_model_generic(data=data.strat.10,
+                      model="systori",
+                      folder="model_fits_test",
+                      file="systori_strat10"),
+    format="file"
+  ),
+  tar_target(
+    fit.systori.strat10,
+    get_subdata_fit(data=data.strat.10,
+                    model_file=model.systori.strat10,
                     model_type="systori",
                     model_function="model_systori",
                     correspondance_table)

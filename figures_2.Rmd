@@ -402,7 +402,7 @@ predict_spatial_crossval |>
 In this section I compare the output of the same model, which account for system x origin as a fixed effect on asymptotical height and slope. The output represents 4 differents dataset or model specificities :
 
 * "global fit" is the concatenation of the 20 fits from the spatial cross-validation
-* two models were fitted with stratified datasets. These datasets were built by sampling a fixed number of observations in 10cm-dbh categories, either 100 or 50 observations. Categories with lower observations than these thresholds were entirely selected. 
+* three models were fitted with stratified datasets. These datasets were built by sampling a fixed number of observations in 10cm-dbh categories, either 100, 50 or 10 observations. Categories with lower observations than these thresholds were entirely selected. 
 * A model fitted over a subdataset (30% of whole dataset)
 *  A model fitted over a subdataset (30% of whole dataset) but where data were weighted according to the abundance in 10cm-dbh categories.
 
@@ -411,6 +411,7 @@ In this section I compare the output of the same model, which account for system
 ```{r}
 tar_load(data.strat.100)
 tar_load(data.strat.50)
+tar_load(data.strat.10)
 tar_load(mod.data)
 tar_load(sub.mod.data.3.ba.w)
 tar_read(global_fit_systori)$trajectory %>% 
@@ -461,6 +462,22 @@ tar_read(fit.systori.strat50)$trajectory %>%
   labs(color="Origin",
        title="Output from model fitted with stratified data, 50 obs per diameter class")
 
+tar_read(fit.systori.strat10)$trajectory %>% 
+  mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry")),
+         origin=factor(origin,levels=c("planted","recruited","remnant"))) %>% 
+  ggplot()+
+  geom_point(data=data.strat.10,aes(dbh,H,color=origin),alpha=0.1,guide='none')+
+  geom_ribbon(aes(dbh,ymin=H_q05,ymax=H_q95,group=origin),fill="grey",alpha=0.5)+
+  geom_line(aes(dbh,H_med,group=origin,color=origin))+
+  facet_wrap(~system,nrow=1)+
+  scale_color_manual(labels=c("Planted","Recruited","Remnant"),
+                     values=c("darkred","steelblue2","forestgreen"))+
+  scale_y_log10()+
+  theme_light()+
+  theme(legend.position = "top")+
+  labs(color="Origin",
+       title="Output from model fitted with stratified data, 10 obs per diameter class")
+
 tar_read(fit.systori.subdata.3.ba.w)$trajectory %>% 
   mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry")),
          origin=factor(origin,levels=c("planted","recruited","remnant"))) %>% 
@@ -492,6 +509,7 @@ tar_load(sub.mod.data.3.ba.w)
 rbind(tar_read(global_fit_systori)$trajectory %>% mutate(fit="global_crossval"),
       tar_read(fit.systori.strat100)$trajectory %>% mutate(fit="stratif_100"),
       tar_read(fit.systori.strat50)$trajectory %>% mutate(fit="stratif_50"),
+      tar_read(fit.systori.strat10)$trajectory %>% mutate(fit="stratif_10"),
       tar_read(subdata_fit_systori)$trajectory %>% mutate(fit="subdata"),
       tar_read(fit.systori.subdata.3.ba.w)$trajectory %>%  mutate(fit="weighted")) %>% 
   mutate(system=factor(system,levels=c("forest","old_sf","young_sf","plantation","agroforestry")),
