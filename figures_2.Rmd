@@ -399,7 +399,7 @@ predict_spatial_crossval |>
 
 # Comparison of fits with different datasets
 
-In this section I compare the output of the same model, which account for system x origin as a fixed effect on asymptotical height and slope. The output represents 4 differents dataset or model specificities :
+In this section I compare the output of the same model, which account for system x origin as a fixed effect on asymptotical height and slope. The output represents 6 differents datasets or model specificities :
 
 * "global fit" is the concatenation of the 20 fits from the spatial cross-validation
 * three models were fitted with stratified datasets. These datasets were built by sampling a fixed number of observations in 10cm-dbh categories, either 100, 50 or 10 observations. Categories with lower observations than these thresholds were entirely selected. 
