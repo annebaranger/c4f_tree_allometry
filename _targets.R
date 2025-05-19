@@ -271,7 +271,8 @@ list(
     fit_systori_weight(data=sub.mod.data.3.ba.w,
                        model="stan/model_cov_nul_weight.stan",
                        folder="model_fits_test",
-                       file="sub.mod.data.3.ba.w")
+                       file="sub.mod.data.3.ba.w"),
+    format="file"
   ),
   
   tar_target(
