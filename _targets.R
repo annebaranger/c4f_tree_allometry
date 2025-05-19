@@ -148,6 +148,28 @@ list(
              ba_require=TRUE)
   ),
   
+  
+  #' stratified data
+  tar_target(
+    data.strat.100,
+    sample_data(mod.data,
+                 groups=c("system","origin"),
+                 target_n=100)
+  ),
+  
+  tar_target(
+    data.strat.50,
+    sample_data(mod.data,
+                groups=c("system","origin"),
+                target_n=50)
+  ),
+  
+  #' weigthed data
+  tar_target(
+    sub.mod.data.3.ba.w,
+    weight_data(sub.mod.data.3.ba,
+                groups=c("system","origin"))
+  ),
   #### Models "pre-fit" for variable selection ####
   #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
@@ -205,7 +227,61 @@ list(
                     correspondance_table)
   ),
   
+  #### Fit with strat data ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
+  tar_target(
+    model.systori.strat100,
+    fit_model_generic(data=data.strat.100,
+                      model="systori",
+                      folder="model_fits_test",
+                      file="systori_strat100"),
+    format="file"
+  ),
+  tar_target(
+    fit.systori.strat100,
+    get_subdata_fit(data=data.strat.100,
+                    model_file=model.systori.strat100,
+                    model_type="systori",
+                    model_function="model_systori",
+                    correspondance_table)
+  ),
+  
+  tar_target(
+    model.systori.strat50,
+    fit_model_generic(data=data.strat.50,
+                      model="systori",
+                      folder="model_fits_test",
+                      file="systori_strat100"),
+    format="file"
+  ),
+  tar_target(
+    fit.systori.strat50,
+    get_subdata_fit(data=data.strat.50,
+                    model_file=model.systori.strat50,
+                    model_type="systori",
+                    model_function="model_systori",
+                    correspondance_table)
+  ),
+  
+  #### Fit with weighted data ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  tar_target(
+    model.systori.subdata.3.ba.w,
+    fit_systori_weight(data=sub.mod.data.3.ba.w,
+                       model="stan/model_cov_nul_weight.stan",
+                       folder="model_fits_test",
+                       file="sub.mod.data.3.ba.w")
+  ),
+  
+  tar_target(
+    fit.systori.subdata.3.ba.w,
+    get_subdata_fit(data=sub.mod.data.3.ba.w,
+                    model_file=model.systori.subdata.3.ba.w,
+                    model_type="systori",
+                    model_function="model_systori",
+                    correspondance_table)
+  ),
   #### Spatial cross-validation ####
   #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   # tar_target(

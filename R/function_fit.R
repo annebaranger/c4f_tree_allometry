@@ -76,7 +76,7 @@ model_complete <- function(x,ba,precmin,
 #' @author Anne Baranger (INRAE - LESSEM)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#' @param tree.merge file where trees were merges
+#' @param tree.merge file where trees were merged
 #' @param plot.merge Idem for plots
 
 data.fit<-function(tree,
@@ -124,7 +124,22 @@ data.fit<-function(tree,
   return(data_tree)
 }
 
-
+sample_data<-function(mod.data,
+                      groups=c("system","origin"),
+                      target_n=100){
+  data.strat<- mod.data %>% 
+    group_by(!!!syms(c(groups,"dbh_cat"))) %>% 
+    sample_n(size = min(n(), target_n)) 
+  return(data.strat)
+}
+  
+weight_data<-function(mod.data,
+                      groups=c("system","origin")){
+  data.weight<- mod.data %>% 
+    group_by(!!!syms(c(groups,"dbh_cat"))) %>% 
+    mutate(weight=1/n())
+  return(data.weight)
+}
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 2 - model shape selection ####
@@ -587,6 +602,180 @@ load.rename<-function(dir.object,new_name){
   return(invisible(NULL))
 }
 
+#' fit model with weight
+#' @param data data to use
+#' @param model type of model to fit
+#' @param folder where to save
+#' @param file model name
+fit_systori_weight<-function(data,
+                             model="stan/model_cov_nul_weight.stan",
+                             folder,
+                             file){
+  if(!dir.exists(folder)){
+    dir.create(path=folder)
+  }
+  
+  file.save=file.path(folder,paste0(file,".rdata"))
+  
+  cof="systori"
+  data_weight = list(
+    N = dim(data)[1],
+    p =nlevels(data$id_plot),
+    sp=nlevels(data$g_s),
+    ncof=nlevels(as.factor(data[[cof]])),
+    plot=as.numeric(data$id_plot),
+    species=as.numeric(data$g_s),
+    cof=as.numeric(as.factor(data[[cof]])),
+    H = data$H ,
+    dbh=data$dbh,
+    weight=data$weight
+  )
+  HD_weight=stan(file=model, # stan program
+              data = data_weight,         # dataset
+              warmup = 1000,          # number of warmup iterations per chain
+              iter = 2000,
+              include = FALSE,
+              pars=c("gamma_plot","gamma_sp"),
+              cores = 4)
+  save(HD_weight,file=file.save)
+  
+  return(file.save)
+  
+  
+}
+
+
+#' Fit a model - generic function
+#' @param data data to use
+#' @param model type of model to fit
+#' @param folder where to save
+#' @param file model name
+fit_model_generic<-function(data,
+                            model,
+                            folder,
+                            file){
+  if(!dir.exists(folder)){
+    dir.create(path=folder)
+  }
+  
+  file.save=file.path(folder,paste0(file,".rdata"))
+  
+  ## model nul
+  if(model=="nul"){
+    data_nul = list(
+      N = dim(data)[1],
+      p =nlevels(data$id_plot),
+      sp=nlevels(data$g_s),
+      plot=as.numeric(data$id_plot),
+      species=as.numeric(data$g_s),
+      H = data$H ,
+      dbh=data$dbh
+    )
+    HD_nul=stan(file="stan/model_cof_nul.stan", # stan program
+                data = data_nul,         # dataset
+                warmup = 1000,          # number of warmup iterations per chain
+                iter = 2000,
+                include = FALSE,
+                pars=c("gamma_plot","gamma_sp","log_lik"),
+                cores = 4)
+    save(HD_nul,file=file.save)
+  }
+  
+  ## model origin
+  if(model=="origin"){
+    cof="origin"
+    data_origin = list(
+      N = dim(data)[1],
+      p =nlevels(data$id_plot),
+      sp=nlevels(data$g_s),
+      ncof=nlevels(as.factor(data[[cof]])),
+      plot=as.numeric(data$id_plot),
+      species=as.numeric(data$g_s),
+      cof=as.numeric(as.factor(data[[cof]])),
+      H = data$H ,
+      dbh=data$dbh
+    )
+    HD_origin=stan(file="stan/model_cov_nul.stan",
+                   data=data_origin,
+                   warmup = 1000,
+                   iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp","log_lik"),
+                   core=4)
+    save(HD_origin,file=file.save)
+  }
+  ## model system
+  if(model=="system"){
+    cof="system"
+    data_system = list(
+      N = dim(data)[1],
+      p =nlevels(data$id_plot),
+      sp=nlevels(data$g_s),
+      ncof=nlevels(as.factor(data[[cof]])),
+      plot=as.numeric(data$id_plot),
+      species=as.numeric(data$g_s),
+      cof=as.numeric(as.factor(data[[cof]])),
+      H = data$H ,
+      dbh=data$dbh
+    )
+    HD_system=stan(file="stan/model_cov_nul.stan",
+                   data=data_system,
+                   warmup = 1000,
+                   iter=2000,
+                   include = FALSE,
+                   pars=c("gamma_plot","gamma_sp","log_lik"),
+                   core=4)
+    save(HD_system,file=file.save)
+  }
+  ## model system origin
+  if(model=="systori"){
+    cof="systori"
+    data_systori = list(
+      N = dim(data)[1],
+      p =nlevels(data$id_plot),
+      sp=nlevels(data$g_s),
+      ncof=nlevels(as.factor(data[[cof]])),
+      plot=as.numeric(data$id_plot),
+      species=as.numeric(data$g_s),
+      cof=as.numeric(as.factor(data[[cof]])),
+      H = data$H ,
+      dbh=data$dbh
+    )
+    HD_systori=stan(file="stan/model_cov_nul.stan",
+                    data=data_systori,
+                    warmup = 1000,
+                    iter=2000,
+                    include = FALSE,
+                    pars=c("gamma_plot","gamma_sp","log_lik"),
+                    core=4)
+    save(HD_systori,file=file.save)
+  }
+  ## model complete
+  if(model=="complete"){
+    data_complete = list(
+      N = dim(data)[1],
+      p =nlevels(data$id_plot),
+      sp=nlevels(data$g_s),
+      so=nlevels(as.factor(data$systori)),
+      plot=as.numeric(data$id_plot),
+      species=as.numeric(data$g_s),
+      systori=as.numeric(as.factor(data[["systori"]])),
+      H = data$H,
+      dbh=data$dbh,
+      ba=data$ba_tot,
+      precmin=data$bio17
+    )
+    HD_complete=stan(file="stan/model_total_ba_prec.stan", # stan program
+                     data = data_complete,         # dataset
+                     warmup = 1000,          # number of warmup iterations per chain
+                     iter = 2000,
+                     include = FALSE,
+                     pars=c("gamma_plot","gamma_sp","log_lik"),
+                     core=4)   
+    save(HD_complete,file=file.save)
+  }
+  return(file.save)
+}
 
 #' Get one model fit, for subdata
 #' @param mod.file table with all model to run on which dataset
